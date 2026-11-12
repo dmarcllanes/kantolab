@@ -4,7 +4,7 @@ import { checkConnection, saveKeyFor, savedKeyFor } from '../../core/agent/sessi
 import type { AgentConfig } from '../../core/agent/types'
 import { presetForBaseUrl } from '../../core/engine/cloudProviders'
 import { ANTHROPIC_MODEL_SUGGESTIONS, isLocalServer, OPENAI_BASE_URL_EXAMPLES, type ConnectionCheck } from '../../core/engine/providers'
-import { currentConsent } from '../../core/privacy/consent'
+import { useConsent } from '../../core/privacy/consent'
 import { Button } from '../ui/Button'
 import { Field, inputClass } from '../ui/Field'
 
@@ -21,6 +21,8 @@ export function ProviderSetup({ draft, update }: { draft: AgentConfig; update: (
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<ConnectionCheck | null>(null)
   const [models, setModels] = useState<string[]>([])
+  /** Typing a name by hand instead of choosing from the loaded list. */
+  const [typing, setTyping] = useState(false)
 
   const check = async (quiet: boolean, agent = draft) => {
     if (!quiet) {
@@ -38,21 +40,32 @@ export function ProviderSetup({ draft, update }: { draft: AgentConfig; update: (
     }
   }
 
-  // Load the saved key, then (if allowed) quietly fetch the model list. Lists models only; generates nothing.
+  const remoteAllowed = useConsent((c) => c.decided && c.choices.remoteAi)
+  const [keyLoaded, setKeyLoaded] = useState(false)
+
+  // Load the saved key once.
   useEffect(() => {
     let live = true
     void savedKeyFor(draft).then((k) => {
       if (!live) return
       setKey(k)
       setHasKey(!!k)
-      if ((k || local) && currentConsent().remoteAi && (draft.provider === 'anthropic' || draft.baseUrl.trim())) void check(true)
+      setKeyLoaded(true)
     })
     return () => {
       live = false
     }
-    // Runs once per mount; the parent remounts this when the provider or server changes.
+    // Once per mount; the parent remounts this when the provider or server changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Quietly fetch the model list once there's a key and cloud AI is allowed
+  // (also right after the privacy dialog is answered). Lists models only; generates nothing.
+  const canList = keyLoaded && (hasKey || local) && remoteAllowed && (draft.provider === 'anthropic' || !!draft.baseUrl.trim())
+  useEffect(() => {
+    if (canList) void check(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canList])
 
   const saveKey = async () => {
     await saveKeyFor(draft, key)
@@ -62,7 +75,14 @@ export function ProviderSetup({ draft, update }: { draft: AgentConfig; update: (
 
   const suggestions = models.length ? models : draft.provider === 'anthropic' ? ANTHROPIC_MODEL_SUGGESTIONS : preset?.defaultModel ? [preset.defaultModel] : []
   const listId = `models-${draft.id}`
-  const modelMissing = models.length > 0 && draft.modelId.trim() !== '' && !models.includes(draft.modelId.trim()) && !/\/free$|\/auto$/.test(draft.modelId)
+  const CUSTOM = '__custom__'
+  const current = draft.modelId.trim()
+  // Routers like "openrouter/free" work without being listed.
+  const isRouter = /\/free$|\/auto$/.test(current)
+  const options = isRouter && !models.includes(current) ? [current, ...models] : models
+  const inList = options.includes(current)
+  const showSelect = models.length > 0 && !typing
+  const modelMissing = models.length > 0 && current !== '' && !inList
 
   return (
     <div className="space-y-3">
@@ -123,24 +143,61 @@ export function ProviderSetup({ draft, update }: { draft: AgentConfig; update: (
         </Field>
       )}
 
-      <Field label="Model" tip="provider" hint={models.length ? `${models.length} models available with your key. Start typing or open the list.` : 'Save your key to load the list of models.'}>
-        <input
-          list={listId}
-          placeholder={preset?.defaultModel || 'model name'}
-          value={draft.modelId}
-          onChange={(e) => update({ modelId: e.target.value })}
-          className={`${inputClass} font-mono`}
-        />
+      <Field
+        label="Model"
+        tip="provider"
+        hint={showSelect ? `${models.length} models available with your key.` : models.length ? 'Type any model name this provider accepts.' : 'Save your key to load the list of models.'}
+      >
+        {showSelect ? (
+          <select
+            value={inList ? current : ''}
+            onChange={(e) => {
+              if (e.target.value === CUSTOM) return setTyping(true)
+              update({ modelId: e.target.value })
+              setResult(null)
+            }}
+            className={`${inputClass} font-mono`}
+            aria-label="Model"
+          >
+            {!inList && (
+              <option value="" disabled>
+                {current ? `${current} (not available)` : 'Choose a model…'}
+              </option>
+            )}
+            {options.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+            <option value={CUSTOM}>Other… (type a name)</option>
+          </select>
+        ) : (
+          <input
+            list={listId}
+            placeholder={preset?.defaultModel || 'model name'}
+            value={draft.modelId}
+            onChange={(e) => update({ modelId: e.target.value })}
+            className={`${inputClass} font-mono`}
+            aria-label="Model"
+          />
+        )}
       </Field>
-      <datalist id={listId}>
-        {suggestions.map((m) => (
-          <option key={m} value={m} />
-        ))}
-      </datalist>
-      {(modelMissing || (models.length > 0 && !draft.modelId.trim())) && (
+      {!showSelect && (
+        <datalist id={listId}>
+          {suggestions.map((m) => (
+            <option key={m} value={m} />
+          ))}
+        </datalist>
+      )}
+      {typing && models.length > 0 && (
+        <button type="button" onClick={() => setTyping(false)} className="text-xs text-emerald-300 hover:underline">
+          Choose from the list instead
+        </button>
+      )}
+      {modelMissing && (
         <div className="space-y-1.5 rounded-xl bg-amber-500/8 px-3 py-2 ring-1 ring-amber-500/20">
           <p className="text-[11px] text-amber-300">
-            {modelMissing ? `Your key can’t use “${draft.modelId}” (it may have been retired). Pick one:` : 'Pick a model:'}
+            Your key can’t use “{current}” (it may have been retired). Pick one:
           </p>
           <div className="flex flex-wrap gap-1.5">
             {models.slice(0, 12).map((m) => (

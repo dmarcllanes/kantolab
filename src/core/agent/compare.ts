@@ -56,7 +56,7 @@ export interface RunSummary {
 }
 
 export function summarize(run: RunRecord): RunSummary {
-  const answer = [...run.steps].reverse().find((s) => s.kind === 'assistant')?.content ?? ''
+  const answer = [...run.steps].reverse().find((s) => s.kind === 'assistant' && !s.depth)?.content ?? ''
   return {
     answer,
     totalMs: (run.endedAt ?? run.startedAt) - run.startedAt,

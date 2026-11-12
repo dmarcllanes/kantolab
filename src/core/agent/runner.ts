@@ -8,7 +8,7 @@ import type { AgentConfig, AgentStatus, TraceStep } from './types'
 export interface RunHooks {
   setStatus(status: AgentStatus): void
   addStep(step: Omit<TraceStep, 'id' | 'at'>): void
-  requestApproval(call: { tool: string; args: unknown }): Promise<boolean>
+  requestApproval(call: { tool: string; args: unknown; agent?: string }): Promise<boolean>
   /** Live text of the reply being generated; null when it finishes. */
   onPartial?(text: string | null): void
 }
@@ -21,6 +21,8 @@ export interface RunOptions {
   signal: AbortSignal
   /** Earlier turns of the same chat (user messages and the model's raw final replies). */
   history?: ChatMessage[]
+  /** Set when this run was started by another agent's tool call. */
+  nesting?: { depth: number; ancestors: string[] }
 }
 
 export type RunOutcome =
@@ -32,8 +34,19 @@ const MAX_CONSECUTIVE_FORMAT_ERRORS = 2
 
 const truncate = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s)
 
-export async function runAgent(opts: RunOptions, hooks: RunHooks): Promise<RunOutcome> {
-  const { agent, provider, tools, userMessage, signal, history = [] } = opts
+export async function runAgent(opts: RunOptions, parentHooks: RunHooks): Promise<RunOutcome> {
+  const { agent, provider, tools, userMessage, signal, history = [], nesting = { depth: 0, ancestors: [] } } = opts
+  const { depth } = nesting
+  // Nested runs tag their steps and approval requests with the sub-agent's name.
+  const hooks: RunHooks =
+    depth === 0
+      ? parentHooks
+      : {
+          ...parentHooks,
+          addStep: (step) => parentHooks.addStep({ ...step, depth, agent: agent.name }),
+          requestApproval: (call) => parentHooks.requestApproval({ ...call, agent: agent.name }),
+        }
+  const toolContext = { signal, hooks: parentHooks, depth, ancestors: [...nesting.ancestors, agent.id] }
   const toolsByName = new Map(tools.map((t) => [t.name, t]))
   const system = buildSystemPrompt(agent.systemPrompt, tools)
   const messages: ChatMessage[] = [
@@ -112,7 +125,7 @@ export async function runAgent(opts: RunOptions, hooks: RunHooks): Promise<RunOu
         if (approved) {
           hooks.setStatus('EXECUTING_TOOL')
           const t0 = performance.now()
-          result = await invokeTool(tool, reply.args)
+          result = await invokeTool(tool, reply.args, toolContext)
           hooks.addStep({
             kind: 'tool_result',
             content: result.ok ? `${tool.name} ✓` : `${tool.name} failed at ${result.stage}`,

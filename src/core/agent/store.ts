@@ -40,6 +40,8 @@ export interface LiveStream {
 export interface PendingApproval {
   tool: string
   args: unknown
+  /** Set when a sub-agent (called as a tool) is asking. */
+  agent?: string
 }
 
 interface AgentState {

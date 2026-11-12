@@ -11,7 +11,7 @@ export const CHECK_LABELS: Record<CheckKind, string> = {
 const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase()
 
 export function finalAnswer(run: RunRecord): string {
-  return [...run.steps].reverse().find((s) => s.kind === 'assistant')?.content ?? ''
+  return [...run.steps].reverse().find((s) => s.kind === 'assistant' && !s.depth)?.content ?? ''
 }
 
 export function checkRun(run: RunRecord, check: Check): { pass: boolean; reason: string } {

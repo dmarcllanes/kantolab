@@ -1,5 +1,17 @@
 import { z } from 'zod/v3'
 import { zodToJsonSchema } from 'zod-to-json-schema'
+import type { RunHooks } from '../agent/runner'
+
+/** What the agent loop hands a tool besides its input. Most tools ignore it. */
+export interface ToolContext {
+  signal: AbortSignal
+  /** The calling run's hooks (used by agent tools to nest their own run). */
+  hooks: RunHooks
+  /** Nesting level of the calling run: 0 = the agent the user is talking to. */
+  depth: number
+  /** Agent ids from the top-level agent down to the caller. */
+  ancestors: string[]
+}
 
 export interface Tool<I extends z.ZodTypeAny = z.ZodTypeAny, O extends z.ZodTypeAny = z.ZodTypeAny> {
   name: string
@@ -8,7 +20,7 @@ export interface Tool<I extends z.ZodTypeAny = z.ZodTypeAny, O extends z.ZodType
   output: O
   /** Pause in AWAITING_APPROVAL before running. */
   requiresApproval?: boolean
-  run: (input: z.infer<I>) => Promise<z.infer<O>>
+  run: (input: z.infer<I>, ctx?: ToolContext) => Promise<z.infer<O>>
 }
 
 /**
@@ -33,13 +45,13 @@ export type ToolResult =
  * The only sanctioned way to call a tool: validates raw model-provided args,
  * runs the tool, then validates what it returned.
  */
-export async function invokeTool(tool: Tool, rawArgs: unknown): Promise<ToolResult> {
+export async function invokeTool(tool: Tool, rawArgs: unknown, ctx?: ToolContext): Promise<ToolResult> {
   const input = tool.input.safeParse(rawArgs)
   if (!input.success) return { ok: false, stage: 'input', error: input.error.message }
 
   let raw: unknown
   try {
-    raw = await tool.run(input.data)
+    raw = await tool.run(input.data, ctx)
   } catch (e) {
     return { ok: false, stage: 'run', error: e instanceof Error ? e.message : String(e) }
   }

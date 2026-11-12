@@ -7,12 +7,14 @@ import { db, getSetting } from '../memory/db'
 import { resolveTools } from '../tools/registry'
 import { runAgent, type RunOutcome } from './runner'
 import { isBusy, useAgentStore } from './store'
+import { resolveAgentTools, type ResolveDeps } from './subagent'
 import type { AgentConfig, RunRecord } from './types'
 
 const s = () => useAgentStore.getState()
 
 let localProvider: ChatProvider | null = null
-let activeProvider: ChatProvider | null = null
+/** Providers of the running agent and any sub-agents it called (for Stop). */
+const activeProviders = new Set<ChatProvider>()
 let controller: AbortController | null = null
 let approvalResolver: ((approved: boolean) => void) | null = null
 
@@ -40,6 +42,35 @@ async function providerFor(agent: AgentConfig): Promise<ChatProvider> {
   if (agent.provider === 'anthropic') return createAnthropicProvider({ apiKey, model: agent.modelId })
   if (!agent.baseUrl.trim()) throw new Error('Set a base URL for this OpenAI-compatible agent.')
   return createOpenAICompatibleProvider({ baseUrl: agent.baseUrl, apiKey, model: agent.modelId })
+}
+
+/**
+ * Provider for an agent called as a tool mid-run. It must not touch the state
+ * machine, so a local model is only usable if it's the one already loaded.
+ */
+async function subagentProviderFor(agent: AgentConfig): Promise<ChatProvider> {
+  if (agent.provider === 'webllm') {
+    const loaded = s().loadedModelId
+    if (!localProvider || loaded !== agent.modelId) {
+      throw new Error(
+        loaded
+          ? `"${agent.name}" uses local model ${agent.modelId}, but ${loaded} is loaded. Only one local model fits in memory at a time: give both agents the same local model, or switch one to an API provider.`
+          : `"${agent.name}" uses local model ${agent.modelId}, which isn't loaded. Load it first from that agent's model picker.`,
+      )
+    }
+    activeProviders.add(localProvider)
+    return localProvider
+  }
+  const provider = await providerFor(agent)
+  activeProviders.add(provider)
+  return provider
+}
+
+const toolDeps: ResolveDeps = {
+  providerFor: subagentProviderFor,
+  toolsFor: (agent, ancestors) => resolveAgentTools(agent, ancestors, toolDeps),
+  resolvePlain: resolveTools,
+  loadAgent: (id) => db.agents.get(id),
 }
 
 function errorText(e: unknown): string {
@@ -85,11 +116,12 @@ export async function startRun(agent: AgentConfig, userMessage: string, opts: Ru
 
   let outcome: RunOutcome
   try {
-    activeProvider = await providerFor(agent)
-    const tools = await resolveTools(agent.toolNames)
+    const provider = await providerFor(agent)
+    activeProviders.add(provider)
+    const tools = await resolveAgentTools(agent, [agent.id], toolDeps)
     controller = new AbortController()
     outcome = await runAgent(
-      { agent, provider: activeProvider, tools, userMessage, signal: controller.signal, history: opts.history },
+      { agent, provider, tools, userMessage, signal: controller.signal, history: opts.history },
       {
         setStatus: (status) => s().transition(status),
         addStep: (step) => s().appendStep(step),
@@ -112,7 +144,7 @@ export async function startRun(agent: AgentConfig, userMessage: string, opts: Ru
     outcome = { status: 'ERROR', error: errorText(e) }
   } finally {
     controller = null
-    activeProvider = null
+    activeProviders.clear()
     s().setStream(null)
   }
 
@@ -161,7 +193,7 @@ export async function sendMessage(agent: AgentConfig, message: string): Promise<
 export function stopRun(): void {
   if (s().status === 'LOADING_MODEL') return
   controller?.abort()
-  activeProvider?.interrupt()
+  for (const p of activeProviders) p.interrupt()
   approvalResolver?.(false)
 }
 

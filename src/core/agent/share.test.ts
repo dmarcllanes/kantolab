@@ -1,7 +1,8 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '../memory/db'
-import { newAgent } from './agents'
+import { deleteAgent, newAgent } from './agents'
+import { agentRef } from './subagent'
 import { bundleAgent, decodeBundle, encodeBundle, importBundle, parseBundle } from './share'
 
 beforeEach(async () => {
@@ -21,6 +22,22 @@ const tool = {
 }
 
 describe('share', () => {
+  it('never bundles or imports references to other local agents', async () => {
+    const agent = newAgent({ toolNames: ['calculator', agentRef('local-only')] })
+    const bundle = await bundleAgent(agent)
+    expect(bundle.agent.toolNames).toEqual(['calculator'])
+    const imported = await importBundle({ ...bundle, agent: { ...bundle.agent, toolNames: ['calculator', agentRef('x')] } })
+    expect(imported.toolNames).toEqual(['calculator'])
+  })
+
+  it('removes a deleted agent from agents that used it as a tool', async () => {
+    const helper = newAgent()
+    const boss = newAgent({ toolNames: ['calculator', agentRef(helper.id)] })
+    await db.agents.bulkAdd([helper, boss])
+    await deleteAgent(helper.id)
+    expect((await db.agents.get(boss.id))?.toolNames).toEqual(['calculator'])
+  })
+
   it('round-trips an agent with its custom tools through a URL-safe string', async () => {
     await db.customTools.add(tool)
     const agent = newAgent({ name: 'Shouter', toolNames: ['calculator', 'shout'], systemPrompt: 'Be loud. ✨' })

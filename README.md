@@ -6,6 +6,7 @@ A free, zero-backend playground for assembling, running and inspecting AI agents
 - **Bring your own key** for Anthropic or any OpenAI-compatible API (Groq, OpenRouter, Ollama…). Keys stay in your browser.
 - **Transparent agent loop** in plain TypeScript (`src/core/agent/runner.ts`) — every model reply, tool call, validation error and approval is recorded in the trace.
 - **Tools**: calculator, current time, document search (BM25 over your uploaded text), `fetch_url` behind an approval gate, and custom tools you write in JavaScript (sandboxed worker).
+- **Agents as tools**: enable another saved agent as a tool (`ask_<name>`); it runs its own loop and its steps show up nested in the trace.
 - **Live streaming** of every reply, with a tokens-per-second readout.
 - **Follow-up chat**: messages continue the conversation until you press New chat.
 - **Compare** two agents on the same question: answers, timing and tool use side by side.

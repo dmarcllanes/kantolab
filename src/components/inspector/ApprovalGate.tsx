@@ -9,7 +9,14 @@ export function ApprovalGate({ pending }: { pending: PendingApproval }) {
     <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
       <div className="flex items-center gap-2 text-sm font-medium text-amber-200">
         <ShieldExclamationPoint className="size-4" />
-        The agent wants to run <code className="font-mono">{pending.tool}</code>
+        {pending.agent ? (
+          <span>
+            Sub-agent <span className="text-amber-100">{pending.agent}</span> wants to run
+          </span>
+        ) : (
+          'The agent wants to run'
+        )}{' '}
+        <code className="font-mono">{pending.tool}</code>
       </div>
       <div className="mt-2">
         <JsonView value={pending.args} expandDepth={3} />

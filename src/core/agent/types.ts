@@ -47,6 +47,10 @@ export const traceStepSchema = z.object({
   content: z.string(),
   /** Structured payload (parsed tool args, tool output, raw model reply, …). */
   data: z.unknown().optional(),
+  /** Nesting level when an agent runs another agent as a tool (absent = top level). */
+  depth: z.number().int().min(1).max(10).optional(),
+  /** Name of the sub-agent that produced this step (only when nested). */
+  agent: z.string().optional(),
 })
 export type TraceStep = z.infer<typeof traceStepSchema>
 

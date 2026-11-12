@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Copy, FileUp, Plus, Share2, Trash } from 'lucide-react'
 import { useRef, useState } from 'react'
-import { duplicateAgent, newAgent } from '../../core/agent/agents'
+import { deleteAgent, duplicateAgent, newAgent } from '../../core/agent/agents'
 import { parseBundle, type AgentBundle } from '../../core/agent/share'
 import { useAgentStore } from '../../core/agent/store'
 import type { AgentConfig } from '../../core/agent/types'
@@ -26,8 +26,8 @@ export function AgentList() {
   }
 
   const remove = async (id: string, name: string) => {
-    if (!confirm(`Delete agent "${name}"? Its saved runs stay in History.`)) return
-    await db.agents.delete(id)
+    if (!confirm(`Delete agent "${name}"? Its saved runs stay in History, and agents that used it as a tool lose that tool.`)) return
+    await deleteAgent(id)
     if (selectedId === id) select(agents.find((a) => a.id !== id)?.id ?? null)
   }
 

@@ -1,4 +1,4 @@
-import { Bot, Braces, PackageCheck, Settings2, ShieldCheck, TriangleExclamationPoint, User, Wrench } from 'lucide-react'
+import { Bot, Braces, CornerDownRight, PackageCheck, Settings2, ShieldCheck, TriangleExclamationPoint, User, Wrench } from 'lucide-react'
 import { useState } from 'react'
 import type { TraceStep, TraceStepKind } from '../../core/agent/types'
 import { JsonView } from '../ui/JsonView'
@@ -19,11 +19,20 @@ export function TraceStepCard({ step, t0, index }: { step: TraceStep; t0: number
   const Icon = meta.icon
   const ms = (step.data as { ms?: unknown } | undefined)?.ms
   return (
-    <li id={`step-${step.id}`} className={`scroll-mt-4 rounded-md border border-l-2 border-zinc-800 bg-zinc-900/60 p-3 transition-shadow motion-safe:animate-step-in ${meta.edge}`}>
+    <li
+      id={`step-${step.id}`}
+      style={step.depth ? { marginLeft: `${Math.min(step.depth, 4) * 1.25}rem` } : undefined}
+      className={`scroll-mt-4 rounded-md border border-l-2 border-zinc-800 p-3 transition-shadow motion-safe:animate-step-in ${step.depth ? 'bg-zinc-900/30' : 'bg-zinc-900/60'} ${meta.edge}`}
+    >
       <div className="flex items-center gap-2 text-xs">
         <span className="font-mono text-zinc-600">{index}</span>
         <Icon className={`size-3.5 ${meta.tone}`} />
-        <span className={`font-medium ${meta.tone}`}>{meta.label}</span>
+        <span className={`font-medium ${meta.tone}`}>{step.depth && step.kind === 'assistant' ? 'Sub-agent answer' : meta.label}</span>
+        {step.agent && (
+          <span className="flex min-w-0 items-center gap-1 truncate text-zinc-400" title={`Step of sub-agent "${step.agent}"`}>
+            <CornerDownRight className="size-3 shrink-0" /> {step.agent}
+          </span>
+        )}
         {typeof ms === 'number' && <span className="font-mono text-zinc-500">{ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`}</span>}
         <span className="ml-auto font-mono text-zinc-500">+{((step.at - t0) / 1000).toFixed(2)}s</span>
         {step.data !== undefined && (

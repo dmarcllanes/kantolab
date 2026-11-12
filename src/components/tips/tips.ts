@@ -92,6 +92,14 @@ export const TIPS = {
       'Code runs in a separate, throwaway worker with no network or storage access, and is stopped after the timeout, so a bug can’t freeze the page.',
     ],
   },
+  agentTools: {
+    title: 'Agents as tools',
+    body: [
+      'Let this agent hand work to another saved agent. The model sees a tool like ask_researcher(task); calling it runs that agent with its own model, prompt and tools, and its final answer comes back as the result.',
+      'The other agent starts fresh: it only sees the task text, not this chat. Its steps appear indented in the trace. Agents can’t call themselves, and nesting stops after 3 levels.',
+      'Local agents must share one model (only one fits in GPU memory); mix freely with API agents.',
+    ],
+  },
   params: {
     title: 'Parameters',
     body: [

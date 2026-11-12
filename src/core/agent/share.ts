@@ -5,6 +5,7 @@ import { db } from '../memory/db'
 import { TOOL_NAME_PATTERN, type CustomToolDef } from '../tools/custom'
 import { BUILTIN_TOOL_NAMES } from '../tools/registry'
 import { newAgent } from './agents'
+import { isAgentRef } from './subagent'
 import type { AgentConfig } from './types'
 
 const sharedToolSchema = z.object({
@@ -51,7 +52,8 @@ export async function bundleAgent(agent: AgentConfig): Promise<AgentBundle> {
       modelId: agent.modelId,
       baseUrl: agent.baseUrl,
       systemPrompt: agent.systemPrompt,
-      toolNames: agent.toolNames,
+      // Other agents used as tools are local references; they don't travel.
+      toolNames: agent.toolNames.filter((n) => !isAgentRef(n)),
       maxSteps: agent.maxSteps,
       temperature: agent.temperature,
     },
@@ -136,7 +138,7 @@ export async function importBundle(bundle: AgentBundle): Promise<AgentConfig> {
         updatedAt: now,
       })
     }
-    const agent = newAgent({ ...bundle.agent, toolNames: bundle.agent.toolNames.map((n) => rename.get(n) ?? n) })
+    const agent = newAgent({ ...bundle.agent, toolNames: bundle.agent.toolNames.filter((n) => !isAgentRef(n)).map((n) => rename.get(n) ?? n) })
     await db.agents.add(agent)
     return agent
   })

@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Code, Plus } from 'lucide-react'
+import { Bot, Code, Plus } from 'lucide-react'
 import { useId, useState } from 'react'
+import { agentAsTool, agentRef, agentToolName } from '../../core/agent/subagent'
 import { db } from '../../core/memory/db'
 import { BUILTIN_TOOLS } from '../../core/tools/builtin'
 import { customToolToTool, newCustomTool, type CustomToolDef } from '../../core/tools/custom'
@@ -21,6 +22,7 @@ function ToolRow({
   schema,
   custom,
   onEdit,
+  agentName,
 }: {
   name: string
   description: string
@@ -30,6 +32,8 @@ function ToolRow({
   schema: () => unknown
   custom?: boolean
   onEdit?: () => void
+  /** Shown for agent tools: the saved agent's display name. */
+  agentName?: string
 }) {
   const [showSchema, setShowSchema] = useState(false)
   const id = useId()
@@ -43,6 +47,11 @@ function ToolRow({
               {name}
             </label>
             {custom && <Badge tone="violet">custom</Badge>}
+            {agentName && (
+              <span className="flex items-center gap-1 text-xs text-zinc-400">
+                <Bot className="size-3" /> {agentName}
+              </span>
+            )}
             {approval && (
               <span className="flex items-center gap-0.5">
                 <Badge tone="amber">asks first</Badge>
@@ -77,8 +86,14 @@ function ToolRow({
   )
 }
 
-export function ToolPicker({ selected, onChange }: { selected: string[]; onChange: (names: string[]) => void }) {
+const noDeps = {
+  providerFor: () => Promise.reject(new Error('preview only')),
+  toolsFor: () => Promise.resolve([]),
+}
+
+export function ToolPicker({ agentId, selected, onChange }: { agentId: string; selected: string[]; onChange: (names: string[]) => void }) {
   const custom = useLiveQuery(() => db.customTools.orderBy('name').toArray(), [], [])
+  const others = useLiveQuery(() => db.agents.orderBy('name').filter((a) => a.id !== agentId).toArray(), [agentId], [])
   const [editing, setEditing] = useState<{ def: CustomToolDef; isNew: boolean } | null>(null)
 
   const toggle = (name: string, on: boolean) => onChange(on ? [...new Set([...selected, name])] : selected.filter((n) => n !== name))
@@ -133,6 +148,30 @@ export function ToolPicker({ selected, onChange }: { selected: string[]; onChang
                 schema={() => toolInputSchema(customToolToTool(d))}
                 custom
                 onEdit={() => setEditing({ def: d, isNew: false })}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <SectionTitle tip="agentTools">Agents as tools</SectionTitle>
+        {others.length === 0 ? (
+          <p className="flex items-center gap-2 text-xs text-zinc-500">
+            <Bot className="size-3.5" /> Create another agent to let this one delegate work to it.
+          </p>
+        ) : (
+          <ul className="space-y-1.5">
+            {others.map((a) => (
+              <ToolRow
+                key={a.id}
+                name={agentToolName(a.name)}
+                agentName={a.name}
+                description={a.systemPrompt.length > 160 ? `${a.systemPrompt.slice(0, 160)}…` : a.systemPrompt}
+                approval={false}
+                checked={selected.includes(agentRef(a.id))}
+                onToggle={(on) => toggle(agentRef(a.id), on)}
+                schema={() => toolInputSchema(agentAsTool(a, noDeps))}
               />
             ))}
           </ul>

@@ -159,7 +159,7 @@ export function AgentEditor({ agent }: { agent: AgentConfig }) {
             </div>
           </div>
         )}
-        {tab === 'tools' && <ToolPicker selected={draft.toolNames} onChange={(toolNames) => update({ toolNames })} />}
+        {tab === 'tools' && <ToolPicker agentId={draft.id} selected={draft.toolNames} onChange={(toolNames) => update({ toolNames })} />}
         {tab === 'docs' && <DocumentsPanel toolEnabled={draft.toolNames.includes('search_documents')} />}
       </div>
     </div>

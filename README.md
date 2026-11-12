@@ -7,10 +7,11 @@ A free, zero-backend playground for assembling, running and inspecting AI agents
 - **Transparent agent loop** in plain TypeScript (`src/core/agent/runner.ts`) — every model reply, tool call, validation error and approval is recorded in the trace.
 - **Tools**: calculator, current time, document search (BM25 over your uploaded text), `fetch_url` behind an approval gate, and custom tools you write in JavaScript (sandboxed worker).
 - **Agents as tools**: enable another saved agent as a tool (`ask_<name>`); it runs its own loop and its steps show up nested in the trace.
+- **Templates**: one click adds a ready-made multi-agent setup (router + specialists, researcher + writer, draft + critic) with a matching test set.
 - **Live streaming** of every reply, with a tokens-per-second readout.
 - **Follow-up chat**: messages continue the conversation until you press New chat.
 - **Compare** two agents on the same question: answers, timing and tool use side by side.
-- **Test sets**: questions with checks (contains / equals / regex / uses tool) run in one go for a pass rate, with history.
+- **Test sets**: questions with checks (contains / equals / regex / uses tool) run in one go for a pass rate. Every run saves the agent's settings, so the history shows the pass-rate change, which cases were fixed or broken, and a prompt diff; any version can be restored as a new agent.
 - **Share agents** as a link (compressed into the URL `#fragment`, never sent to a server) or a file; custom tool code is shown for review before import.
 - **Built-in explanations**: every setting has an ⓘ tip, some with interactive visuals (e.g. a temperature demo).
 - **All data local**: agents, run history, documents, test sets and keys live in IndexedDB.

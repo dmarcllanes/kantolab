@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Copy, FileUp, Plus, Share2, Trash } from 'lucide-react'
+import { Copy, FileUp, LayoutTemplate, Plus, Share2, Trash } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { deleteAgent, duplicateAgent, newAgent } from '../../core/agent/agents'
 import { parseBundle, type AgentBundle } from '../../core/agent/share'
@@ -9,6 +9,7 @@ import { db } from '../../core/memory/db'
 import { Button } from '../ui/Button'
 import { ImportAgentModal } from './ImportAgentModal'
 import { ShareModal } from './ShareModal'
+import { TemplatesModal } from './TemplatesModal'
 
 export function AgentList() {
   const agents = useLiveQuery(() => db.agents.orderBy('updatedAt').reverse().toArray(), [], [])
@@ -17,6 +18,7 @@ export function AgentList() {
   const [sharing, setSharing] = useState<AgentConfig | null>(null)
   const [importing, setImporting] = useState<AgentBundle | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
+  const [templates, setTemplates] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const create = async () => {
@@ -44,8 +46,11 @@ export function AgentList() {
     <div className="flex min-h-0 flex-col">
       <div className="flex items-center gap-1 px-3 py-2">
         <h2 className="text-xs font-semibold tracking-wide text-zinc-400 uppercase">Agents</h2>
-        <Button size="sm" variant="ghost" className="ml-auto" onClick={() => fileInput.current?.click()} title="Import an agent file">
-          <FileUp className="size-3.5" /> Import
+        <Button size="sm" variant="ghost" className="ml-auto" onClick={() => fileInput.current?.click()} title="Import an agent file" aria-label="Import an agent file">
+          <FileUp className="size-3.5" />
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setTemplates(true)} title="Add a ready-made multi-agent setup" aria-label="Templates">
+          <LayoutTemplate className="size-3.5" />
         </Button>
         <Button size="sm" variant="ghost" onClick={() => void create()}>
           <Plus className="size-3.5" /> New
@@ -91,6 +96,14 @@ export function AgentList() {
           </li>
         ))}
       </ul>
+      <button
+        type="button"
+        onClick={() => setTemplates(true)}
+        className="mx-2 mb-2 flex items-center gap-1.5 rounded-md border border-dashed border-zinc-800 px-2 py-1.5 text-left text-xs text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+      >
+        <LayoutTemplate className="size-3.5 shrink-0" /> Start from a multi-agent template
+      </button>
+      {templates && <TemplatesModal current={agents.find((a) => a.id === selectedId)} onClose={() => setTemplates(false)} />}
       {sharing && <ShareModal agent={sharing} onClose={() => setSharing(null)} />}
       {importing && (
         <ImportAgentModal

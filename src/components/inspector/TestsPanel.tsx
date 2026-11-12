@@ -10,6 +10,7 @@ import { db } from '../../core/memory/db'
 import { Button } from '../ui/Button'
 import { inputClass } from '../ui/Field'
 import { SectionTitle } from '../ui/SectionTitle'
+import { VersionHistory } from './VersionHistory'
 
 // Status colours (reserved for pass/fail), always paired with an icon and label.
 const GOOD = '#0ca30c'
@@ -224,26 +225,7 @@ function SetEditor({ set, agent, onOpenRun }: { set: EvalSet; agent: AgentConfig
         <Plus className="size-3.5" /> Add case
       </Button>
 
-      {set.history.length > 1 && (
-        <section className="space-y-1.5">
-          <SectionTitle>Earlier results</SectionTitle>
-          <ul className="space-y-1">
-            {set.history.map((h) => {
-              const passed = h.results.filter((r) => r.pass).length
-              return (
-                <li key={h.at} className="flex items-center gap-2 text-xs">
-                  <span className="w-12 font-mono text-zinc-200 tabular-nums">{Math.round((passed / h.results.length) * 100)}%</span>
-                  <div className="h-1.5 w-24 rounded bg-zinc-800">
-                    <div className="h-full rounded" style={{ width: `${(passed / h.results.length) * 100}%`, backgroundColor: GOOD }} />
-                  </div>
-                  <span className="truncate text-zinc-400">{h.agentName} · {h.modelId}</span>
-                  <span className="ml-auto shrink-0 text-zinc-600">{new Date(h.at).toLocaleDateString()}</span>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-      )}
+      <VersionHistory set={set} />
     </div>
   )
 }

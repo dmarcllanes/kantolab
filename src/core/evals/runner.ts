@@ -5,6 +5,7 @@ import type { AgentConfig } from '../agent/types'
 import { db } from '../memory/db'
 import { checkRun, finalAnswer } from './checks'
 import type { EvalCaseResult, EvalResult, EvalSet } from './types'
+import { snapshotAgent } from './versions'
 
 interface EvalRunState {
   setId: string | null
@@ -20,6 +21,9 @@ const MAX_HISTORY = 10
 
 /** Run every case through the agent, one at a time. Tools that ask first are auto-denied. */
 export async function runEvalSet(set: EvalSet, agent: AgentConfig): Promise<EvalResult | null> {
+  // Freeze the version being tested (read before the busy check so nothing awaits in between).
+  const agentNames = new Map((await db.agents.toArray()).map((a) => [a.id, a.name]))
+  const snapshot = snapshotAgent(agent, agentNames)
   const agents = useAgentStore.getState()
   if (useEvalStore.getState().setId || agents.batch || set.cases.length === 0) return null
   agents.setBatch('tests')
@@ -46,7 +50,7 @@ export async function runEvalSet(set: EvalSet, agent: AgentConfig): Promise<Eval
     useAgentStore.getState().setBatch(null)
   }
   if (results.length === 0) return null
-  const result: EvalResult = { agentId: agent.id, agentName: agent.name, modelId: agent.modelId, at: Date.now(), results }
+  const result: EvalResult = { agentId: agent.id, agentName: agent.name, modelId: agent.modelId, at: Date.now(), results, snapshot }
   const fresh = await db.evalSets.get(set.id)
   if (fresh) await db.evalSets.put({ ...fresh, history: [result, ...fresh.history].slice(0, MAX_HISTORY), updatedAt: Date.now() })
   return result

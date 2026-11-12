@@ -181,6 +181,14 @@ export const TIPS = {
       'They run one after another. If both are local with different models, the second model has to load first (only one fits in GPU memory).',
     ],
   },
+  versions: {
+    title: 'Versions & results',
+    body: [
+      'Every test run saves the agent’s settings at that moment: model, prompt, tools, temperature and max steps.',
+      'Open a row to see what you changed since that agent’s previous run, which cases it fixed or broke, and the prompt diff. ▲/▼ is the change in pass rate, in points.',
+      'Small models are random: a few points either way with no changes is normal. “Restore as a new agent” brings back an old version without touching the current one.',
+    ],
+  },
   tests: {
     title: 'Test sets',
     body: [

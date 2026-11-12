@@ -23,6 +23,12 @@ export interface RunOptions {
   history?: ChatMessage[]
   /** Set when this run was started by another agent's tool call. */
   nesting?: { depth: number; ancestors: string[] }
+  /**
+   * Continue an earlier conversation instead of starting fresh: the original
+   * system prompt, the messages after the user message, and optionally a reply
+   * to use in place of the first model call (an edited model reply).
+   */
+  resume?: { system: string; messages: ChatMessage[]; nextReply?: string; stepsUsed: number }
 }
 
 export type RunOutcome =
@@ -48,39 +54,53 @@ export async function runAgent(opts: RunOptions, parentHooks: RunHooks): Promise
         }
   const toolContext = { signal, hooks: parentHooks, depth, ancestors: [...nesting.ancestors, agent.id] }
   const toolsByName = new Map(tools.map((t) => [t.name, t]))
-  const system = buildSystemPrompt(agent.systemPrompt, tools)
+  const { resume } = opts
+  const system = resume?.system ?? buildSystemPrompt(agent.systemPrompt, tools)
   const messages: ChatMessage[] = [
     { role: 'system', content: system },
     ...history,
     { role: 'user', content: userMessage },
+    ...(resume?.messages ?? []),
   ]
 
-  hooks.addStep({
-    kind: 'system',
-    content: system,
-    data: { tools: tools.map((t) => t.name), provider: provider.id, earlierTurns: history.length / 2 },
-  })
-  hooks.addStep({ kind: 'user', content: userMessage })
+  // A resumed run's caller has already copied the earlier steps into the trace.
+  if (!resume) {
+    hooks.addStep({
+      kind: 'system',
+      content: system,
+      data: { tools: tools.map((t) => t.name), provider: provider.id, earlierTurns: history.length / 2 },
+    })
+    hooks.addStep({ kind: 'user', content: userMessage })
+  }
 
+  let forcedReply = resume?.nextReply
   let formatErrors = 0
   try {
-    for (let step = 1; step <= agent.maxSteps; step++) {
+    // An edited reply always gets its turn, even if the edit was at the last allowed step.
+    const lastStep = Math.max(agent.maxSteps, (resume?.stepsUsed ?? 0) + (resume?.nextReply !== undefined ? 1 : 0))
+    for (let step = (resume?.stepsUsed ?? 0) + 1; step <= lastStep; step++) {
       signal.throwIfAborted()
       hooks.setStatus('THINKING')
 
       const started = performance.now()
       const onPartial = hooks.onPartial
-      const raw = await provider.chat(messages, {
-        temperature: agent.temperature,
-        ...(onPartial ? { onText: (text: string) => onPartial(text) } : {}),
-      })
+      const edited = forcedReply !== undefined
+      const raw =
+        forcedReply ??
+        (await provider.chat(messages, {
+          temperature: agent.temperature,
+          ...(onPartial ? { onText: (text: string) => onPartial(text) } : {}),
+        }))
+      forcedReply = undefined
       onPartial?.(null)
       const ms = Math.round(performance.now() - started)
+      // An edited reply is recorded like a model reply, flagged so the trace shows it.
+      const mark = edited ? { edited: true } : {}
       signal.throwIfAborted()
       messages.push({ role: 'assistant', content: raw })
 
       if (tools.length === 0) {
-        hooks.addStep({ kind: 'assistant', content: raw, data: { step, ms } })
+        hooks.addStep({ kind: 'assistant', content: raw, data: { step, ms }, ...mark })
         hooks.setStatus('COMPLETED')
         return { status: 'COMPLETED', answer: raw, raw }
       }
@@ -89,7 +109,7 @@ export async function runAgent(opts: RunOptions, parentHooks: RunHooks): Promise
 
       if (reply.kind === 'invalid') {
         formatErrors++
-        hooks.addStep({ kind: 'error', content: reply.error, data: { step, ms, raw } })
+        hooks.addStep({ kind: 'error', content: reply.error, data: { step, ms, raw }, ...mark })
         if (formatErrors > MAX_CONSECUTIVE_FORMAT_ERRORS) {
           return { status: 'ERROR', error: `Model broke the JSON protocol ${formatErrors} times in a row.` }
         }
@@ -99,7 +119,7 @@ export async function runAgent(opts: RunOptions, parentHooks: RunHooks): Promise
       formatErrors = 0
 
       if (reply.kind === 'final') {
-        hooks.addStep({ kind: 'assistant', content: reply.answer, data: { step, ms, thought: reply.thought, raw } })
+        hooks.addStep({ kind: 'assistant', content: reply.answer, data: { step, ms, thought: reply.thought, raw }, ...mark })
         hooks.setStatus('COMPLETED')
         return { status: 'COMPLETED', answer: reply.answer, raw }
       }
@@ -108,6 +128,7 @@ export async function runAgent(opts: RunOptions, parentHooks: RunHooks): Promise
         kind: 'tool_call',
         content: `${reply.tool}(${truncate(JSON.stringify(reply.args) ?? '', 200)})`,
         data: { step, ms, tool: reply.tool, args: reply.args, thought: reply.thought, raw },
+        ...mark,
       })
 
       const tool = toolsByName.get(reply.tool)

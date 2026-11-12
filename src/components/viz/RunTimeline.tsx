@@ -25,7 +25,8 @@ interface Segment {
 function buildSegments(steps: TraceStep[]): Segment[] {
   const out: Segment[] = []
   for (let i = 1; i < steps.length; i++) {
-    const category = categoryOf(steps[i].kind)
+    // Replayed steps (copied from an earlier run) took no time in this one.
+    const category = steps[i].replayed ? null : categoryOf(steps[i].kind)
     if (!category) continue
     out.push({ stepId: steps[i].id, index: i + 1, category, ms: Math.max(0, steps[i].at - steps[i - 1].at), title: steps[i].content })
   }

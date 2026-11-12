@@ -181,6 +181,21 @@ export const TIPS = {
       'They run one after another. If both are local with different models, the second model has to load first (only one fits in GPU memory).',
     ],
   },
+  rerun: {
+    title: 'Edit & re-run',
+    body: [
+      'Change one step of a finished run and continue from there. Edit a model reply to force a different tool call or answer, or edit a tool result to see how the agent copes with other data or an error.',
+      'Everything before the step is replayed exactly as it was (no model calls), so you only pay for what comes after. The new run is saved to History next to the original.',
+    ],
+  },
+  grader: {
+    title: 'AI grader',
+    body: [
+      'For answers a word match can’t check (“is it polite?”, “does it cite a source?”), an agent reads the question, the answer and your rubric, and replies pass or fail with a reason.',
+      'It runs on your local model or your own API key, so it costs nothing extra here. Its reply is validated like any tool call, and you can open it under each result.',
+      'Write rubrics as concrete, checkable points. A grader on a bigger model than the tested agent is more reliable.',
+    ],
+  },
   versions: {
     title: 'Versions & results',
     body: [

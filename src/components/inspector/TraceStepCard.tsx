@@ -1,4 +1,4 @@
-import { Bot, Braces, CornerDownRight, PackageCheck, Settings2, ShieldCheck, TriangleExclamationPoint, User, Wrench } from 'lucide-react'
+import { Bot, Braces, CornerDownRight, Pencil, PackageCheck, Settings2, ShieldCheck, TriangleExclamationPoint, User, Wrench } from 'lucide-react'
 import { useState } from 'react'
 import type { TraceStep, TraceStepKind } from '../../core/agent/types'
 import { JsonView } from '../ui/JsonView'
@@ -13,7 +13,7 @@ const KIND: Record<TraceStepKind, { label: string; icon: typeof Bot; tone: strin
   error: { label: 'Error', icon: TriangleExclamationPoint, tone: 'text-red-300', edge: 'border-l-red-400/70' },
 }
 
-export function TraceStepCard({ step, t0, index }: { step: TraceStep; t0: number; index: number }) {
+export function TraceStepCard({ step, t0, index, onEdit }: { step: TraceStep; t0: number; index: number; onEdit?: () => void }) {
   const [showData, setShowData] = useState(false)
   const meta = KIND[step.kind]
   const Icon = meta.icon
@@ -22,7 +22,7 @@ export function TraceStepCard({ step, t0, index }: { step: TraceStep; t0: number
     <li
       id={`step-${step.id}`}
       style={step.depth ? { marginLeft: `${Math.min(step.depth, 4) * 1.25}rem` } : undefined}
-      className={`scroll-mt-4 rounded-md border border-l-2 border-zinc-800 p-3 transition-shadow motion-safe:animate-step-in ${step.depth ? 'bg-zinc-900/30' : 'bg-zinc-900/60'} ${meta.edge}`}
+      className={`group/step scroll-mt-4 rounded-md border border-l-2 p-3 transition-shadow motion-safe:animate-step-in ${step.edited ? 'border-amber-500/40' : 'border-zinc-800'} ${step.depth ? 'bg-zinc-900/30' : 'bg-zinc-900/60'} ${step.replayed ? 'opacity-60' : ''} ${meta.edge}`}
     >
       <div className="flex items-center gap-2 text-xs">
         <span className="font-mono text-zinc-600">{index}</span>
@@ -34,7 +34,19 @@ export function TraceStepCard({ step, t0, index }: { step: TraceStep; t0: number
           </span>
         )}
         {typeof ms === 'number' && <span className="font-mono text-zinc-500">{ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`}</span>}
+        {step.edited && <span className="rounded bg-amber-500/15 px-1.5 font-mono text-[10px] text-amber-200">edited</span>}
+        {step.replayed && <span className="font-mono text-[10px] text-zinc-500" title="Copied from the original run">replayed</span>}
         <span className="ml-auto font-mono text-zinc-500">+{((step.at - t0) / 1000).toFixed(2)}s</span>
+        {onEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            title="Change this step and continue the run from here"
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 sm:opacity-0 sm:group-hover/step:opacity-100 sm:focus-visible:opacity-100"
+          >
+            <Pencil className="size-3" /> Edit
+          </button>
+        )}
         {step.data !== undefined && (
           <button
             type="button"

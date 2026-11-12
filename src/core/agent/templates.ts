@@ -111,7 +111,7 @@ export const TEMPLATES: AgentTemplate[] = [
         { input: 'How does KantoLab rank document search results?', check: { kind: 'contains', value: 'BM25' } },
         { input: 'Where does KantoLab store my agents?', check: { kind: 'contains', value: 'IndexedDB' } },
         { input: 'What is the default local model?', check: { kind: 'tool_used', value: 'search_documents' } },
-        { input: 'Can an agent call another agent?', check: { kind: 'regex', value: 'yes|can' } },
+        { input: 'Can an agent call another agent?', check: { kind: 'judge', value: 'Says yes, and mentions that the called agent’s steps show in the trace or that nesting is limited. Names a source.' } },
       ],
     },
   },
@@ -143,7 +143,8 @@ export const TEMPLATES: AgentTemplate[] = [
       name: 'Draft checks',
       cases: [
         { input: 'Write a two-sentence product blurb for a reusable water bottle.', check: { kind: 'tool_used', value: '{{tool:critic}}' } },
-        { input: 'Write a polite note declining a meeting on Friday.', check: { kind: 'regex', value: 'friday' } },
+        { input: 'Write a polite note declining a meeting on Friday.', check: { kind: 'judge', value: 'Clearly declines the Friday meeting, is polite, and is under 80 words.' } },
+        { input: 'Write a two-sentence product blurb for a reusable water bottle.', check: { kind: 'judge', value: 'Exactly two sentences, about a reusable water bottle, with at least one concrete benefit.' } },
       ],
     },
   },

@@ -6,6 +6,7 @@ export const CHECK_LABELS: Record<CheckKind, string> = {
   equals: 'Answer equals',
   regex: 'Answer matches regex',
   tool_used: 'Uses tool',
+  judge: 'AI grader (rubric)',
 }
 
 const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase()
@@ -22,6 +23,9 @@ export function checkRun(run: RunRecord, check: Check): { pass: boolean; reason:
   if (run.outcome !== 'completed') return { pass: false, reason: `Run ${run.outcome === 'error' ? 'failed' : 'was stopped'}` }
   const answer = finalAnswer(run)
   switch (check.kind) {
+    case 'judge':
+      // Graded asynchronously by the eval runner; reaching here means no grader ran.
+      return { pass: false, reason: 'Not graded' }
     case 'contains':
       return norm(answer).includes(norm(check.value))
         ? { pass: true, reason: `Found “${check.value}”` }

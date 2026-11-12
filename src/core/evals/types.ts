@@ -1,6 +1,6 @@
 import type { AgentConfig, RunOutcomeKind } from '../agent/types'
 
-export type CheckKind = 'contains' | 'equals' | 'regex' | 'tool_used'
+export type CheckKind = 'contains' | 'equals' | 'regex' | 'tool_used' | 'judge'
 
 export interface Check {
   kind: CheckKind
@@ -21,6 +21,8 @@ export interface EvalCaseResult {
   answer: string
   ms: number
   outcome: RunOutcomeKind
+  /** For AI-graded cases: who graded and what it replied. */
+  grader?: { agentName: string; raw: string[] }
 }
 
 /** The agent's settings at the time of a test run. */
@@ -35,6 +37,8 @@ export interface EvalResult {
   modelId: string
   at: number
   results: EvalCaseResult[]
+  /** Name of the grader agent, if any case was AI-graded. */
+  graderName?: string
   /** Missing on results saved before versions were recorded. */
   snapshot?: AgentSnapshot
 }
@@ -44,6 +48,8 @@ export interface EvalSet {
   id: string
   name: string
   cases: EvalCase[]
+  /** Agent that grades "AI grader" cases; unset = the agent being tested grades itself. */
+  judgeAgentId?: string
   /** Most recent results, newest first. */
   history: EvalResult[]
   createdAt: number

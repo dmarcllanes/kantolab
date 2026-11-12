@@ -11,7 +11,8 @@ A free, zero-backend playground for assembling, running and inspecting AI agents
 - **Live streaming** of every reply, with a tokens-per-second readout.
 - **Follow-up chat**: messages continue the conversation until you press New chat.
 - **Compare** two agents on the same question: answers, timing and tool use side by side.
-- **Test sets**: questions with checks (contains / equals / regex / uses tool) run in one go for a pass rate. Every run saves the agent's settings, so the history shows the pass-rate change, which cases were fixed or broken, and a prompt diff; any version can be restored as a new agent.
+- **Edit & re-run**: change any model reply or tool result in a finished trace and continue the run from that step; earlier steps are replayed without model calls.
+- **Test sets**: questions with checks (contains / equals / regex / uses tool / AI grader with your rubric) run in one go for a pass rate. Every run saves the agent's settings, so the history shows the pass-rate change, which cases were fixed or broken, and a prompt diff; any version can be restored as a new agent.
 - **Share agents** as a link (compressed into the URL `#fragment`, never sent to a server) or a file; custom tool code is shown for review before import.
 - **Built-in explanations**: every setting has an ⓘ tip, some with interactive visuals (e.g. a temperature demo).
 - **All data local**: agents, run history, documents, test sets and keys live in IndexedDB.

@@ -1,9 +1,10 @@
 import { create } from 'zustand'
-import { startRun, stopRun } from '../agent/session'
+import { chatOnce, startRun, stopRun } from '../agent/session'
 import { useAgentStore } from '../agent/store'
 import type { AgentConfig } from '../agent/types'
 import { db } from '../memory/db'
 import { checkRun, finalAnswer } from './checks'
+import { gradeAnswer } from './judge'
 import type { EvalCaseResult, EvalResult, EvalSet } from './types'
 import { snapshotAgent } from './versions'
 
@@ -29,12 +30,25 @@ export async function runEvalSet(set: EvalSet, agent: AgentConfig): Promise<Eval
   agents.setBatch('tests')
   useEvalStore.setState({ setId: set.id, done: 0, total: set.cases.length, results: [], stopRequested: false })
   const results: EvalCaseResult[] = []
+  let grader: AgentConfig | null = null
   try {
+    // Unset or deleted grader: the tested agent grades itself.
+    if (set.cases.some((c) => c.check.kind === 'judge')) grader = (set.judgeAgentId && (await db.agents.get(set.judgeAgentId))) || agent
     for (const c of set.cases) {
       if (useEvalStore.getState().stopRequested) break
       const res = await startRun(agent, c.input, { approval: 'deny' })
       if (!res) break
-      const verdict = checkRun(res.record, c.check)
+      let verdict: Pick<EvalCaseResult, 'pass' | 'reason' | 'grader'> = checkRun(res.record, c.check)
+      const judge = grader
+      if (c.check.kind === 'judge' && judge && res.record.outcome === 'completed') {
+        if (useEvalStore.getState().stopRequested) break
+        try {
+          const grade = await gradeAnswer((m) => chatOnce(judge, m), c.input, finalAnswer(res.record), c.check.value)
+          verdict = { pass: grade.pass, reason: `Grader: ${grade.reason}`, grader: { agentName: judge.name, raw: grade.raw } }
+        } catch (e) {
+          verdict = { pass: false, reason: `Grader failed: ${e instanceof Error ? e.message : String(e)}` }
+        }
+      }
       results.push({
         caseId: c.id,
         ...verdict,
@@ -50,7 +64,7 @@ export async function runEvalSet(set: EvalSet, agent: AgentConfig): Promise<Eval
     useAgentStore.getState().setBatch(null)
   }
   if (results.length === 0) return null
-  const result: EvalResult = { agentId: agent.id, agentName: agent.name, modelId: agent.modelId, at: Date.now(), results, snapshot }
+  const result: EvalResult = { agentId: agent.id, agentName: agent.name, modelId: agent.modelId, at: Date.now(), results, snapshot, ...(grader ? { graderName: grader.name } : {}) }
   const fresh = await db.evalSets.get(set.id)
   if (fresh) await db.evalSets.put({ ...fresh, history: [result, ...fresh.history].slice(0, MAX_HISTORY), updatedAt: Date.now() })
   return result

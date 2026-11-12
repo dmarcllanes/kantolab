@@ -7,6 +7,7 @@ import { db, getSetting } from '../memory/db'
 import { resolveTools } from '../tools/registry'
 import { runAgent, type RunOutcome } from './runner'
 import { isBusy, useAgentStore } from './store'
+import { planResume, type ResumePlan } from './replay'
 import { resolveAgentTools, type ResolveDeps } from './subagent'
 import type { AgentConfig, RunRecord } from './types'
 
@@ -99,6 +100,8 @@ export interface RunOptions {
   history?: ChatMessage[]
   /** 'deny' auto-denies tools that ask first (used by unattended test runs). */
   approval?: 'ask' | 'deny'
+  /** Continue another run from an edited step (see rerunFrom). */
+  resume?: { plan: ResumePlan; rerunOf: string }
 }
 
 export interface RunResult {
@@ -113,6 +116,9 @@ export async function startRun(agent: AgentConfig, userMessage: string, opts: Ru
   s().viewRun(null)
   s().resetRun()
   const startedAt = Date.now()
+  const plan = opts.resume?.plan
+  const history = plan ? plan.history : opts.history
+  for (const step of plan?.prefix ?? []) s().appendStep(step)
 
   let outcome: RunOutcome
   try {
@@ -121,7 +127,15 @@ export async function startRun(agent: AgentConfig, userMessage: string, opts: Ru
     const tools = await resolveAgentTools(agent, [agent.id], toolDeps)
     controller = new AbortController()
     outcome = await runAgent(
-      { agent, provider, tools, userMessage, signal: controller.signal, history: opts.history },
+      {
+        agent,
+        provider,
+        tools,
+        userMessage,
+        signal: controller.signal,
+        history,
+        ...(plan ? { resume: { system: plan.system, messages: plan.messages, nextReply: plan.nextReply, stepsUsed: plan.stepsUsed } } : {}),
+      },
       {
         setStatus: (status) => s().transition(status),
         addStep: (step) => s().appendStep(step),
@@ -164,6 +178,8 @@ export async function startRun(agent: AgentConfig, userMessage: string, opts: Ru
     endedAt: Date.now(),
     outcome: outcome.status === 'COMPLETED' ? 'completed' : outcome.status === 'ERROR' ? 'error' : 'stopped',
     steps: s().trace,
+    ...(history?.length ? { history } : {}),
+    ...(opts.resume ? { rerunOf: opts.resume.rerunOf } : {}),
   }
   s().setLastRun(record)
   try {
@@ -172,6 +188,21 @@ export async function startRun(agent: AgentConfig, userMessage: string, opts: Ru
     console.error('Could not save run history', e)
   }
   return outcome.status === 'COMPLETED' ? { record, answer: outcome.answer, raw: outcome.raw } : { record }
+}
+
+/**
+ * Re-run `run` from step `index`, with that step's model reply or tool result
+ * replaced by `text`. Uses the agent's current model and tools, and the run's
+ * original system prompt. Returns an error message, or null once it has run.
+ */
+export async function rerunFrom(run: RunRecord, index: number, text: string): Promise<string | null> {
+  if (isBusy(s().status) || s().batch) return 'Wait for the current run to finish.'
+  const agent = await db.agents.get(run.agentId)
+  if (!agent) return `The agent "${run.agentName}" was deleted, so this run can't be continued.`
+  const planned = planResume(run, index, text)
+  if (!planned.ok) return planned.error
+  await startRun(agent, run.userMessage, { resume: { plan: planned.plan, rerunOf: run.id } })
+  return null
 }
 
 /** Send a chat message: continues the conversation with this agent if one is open. */
@@ -186,6 +217,20 @@ export async function sendMessage(agent: AgentConfig, message: string): Promise<
   const result = await startRun(agent, message, { history })
   if (result?.answer !== undefined && result.raw !== undefined) {
     s().pushChatTurn(agent.id, { user: message, answer: result.answer, raw: result.raw })
+  }
+}
+
+/**
+ * One plain chat call with an agent's model, outside the agent loop (used by
+ * the AI grader). May load a local model, so call it only between runs.
+ */
+export async function chatOnce(agent: AgentConfig, messages: ChatMessage[], temperature = 0): Promise<string> {
+  const provider = await providerFor(agent)
+  activeProviders.add(provider)
+  try {
+    return await provider.chat(messages, { temperature })
+  } finally {
+    activeProviders.delete(provider)
   }
 }
 

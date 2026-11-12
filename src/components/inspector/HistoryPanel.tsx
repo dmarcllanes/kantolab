@@ -21,6 +21,7 @@ function RunRow({ run, onOpen, onDelete }: { run: RunRecord; onOpen: () => void;
         <div className="flex items-center gap-2">
           <span className="truncate text-sm">{run.agentName}</span>
           <Badge tone={OUTCOME_TONE[run.outcome]}>{run.outcome}</Badge>
+          {run.rerunOf && <Badge tone="amber">re-run</Badge>}
         </div>
         <p className="truncate text-xs text-zinc-500">
           {new Date(run.startedAt).toLocaleString()} · {run.steps.length} steps · {run.userMessage}

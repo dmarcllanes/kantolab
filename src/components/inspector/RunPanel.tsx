@@ -1,8 +1,8 @@
 import { ArrowLeft, Download, LoaderCircle, MessagesSquare, Play, Sparkles, Square, TriangleExclamationPoint } from 'lucide-react'
 import { useRef, useState } from 'react'
-import { preloadModel, sendMessage, stopRun } from '../../core/agent/session'
+import { preloadModel, rerunFrom, sendMessage, stopRun } from '../../core/agent/session'
 import { isBusy, useAgentStore } from '../../core/agent/store'
-import type { AgentConfig } from '../../core/agent/types'
+import type { AgentConfig, RunRecord } from '../../core/agent/types'
 import type { GpuProfile } from '../../core/engine/webgpu'
 import { db } from '../../core/memory/db'
 import { Button } from '../ui/Button'
@@ -14,6 +14,7 @@ import { HowItWorks } from '../viz/HowItWorks'
 import { RunTimeline } from '../viz/RunTimeline'
 import { StatusPipeline } from '../viz/StatusPipeline'
 import { ApprovalGate } from './ApprovalGate'
+import { EditStepModal } from './EditStepModal'
 import { LiveReply } from './LiveReply'
 import { TraceView } from './TraceView'
 
@@ -51,6 +52,8 @@ export function RunPanel({ agent, gpu }: { agent: AgentConfig | undefined; gpu: 
   const chatAgentId = useAgentStore((s) => s.chatAgentId)
   const resetChat = useAgentStore((s) => s.resetChat)
   const [message, setMessage] = useState('')
+  const [editing, setEditing] = useState<{ run: RunRecord; index: number } | null>(null)
+  const [rerunError, setRerunError] = useState<string | null>(null)
   const box = useRef<HTMLTextAreaElement>(null)
 
   const chat = agent && chatAgentId === agent.id ? chatAll : []
@@ -60,6 +63,15 @@ export function RunPanel({ agent, gpu }: { agent: AgentConfig | undefined; gpu: 
   const noGpu = isLocal && gpu !== null && !gpu.supported
   const steps = viewedRun ? viewedRun.steps : trace
   const exportable = viewedRun ?? lastRun
+  // Steps can be edited once a run is saved: a viewed run, or the live trace after it finished.
+  const editableRun = viewedRun ?? (lastRun && lastRun.steps === trace ? lastRun : null)
+
+  const rerun = async (text: string) => {
+    if (!editing) return
+    const { run: from, index } = editing
+    setEditing(null)
+    setRerunError(await rerunFrom(from, index, text))
+  }
 
   const run = async () => {
     if (!agent || !message.trim()) return
@@ -110,6 +122,15 @@ export function RunPanel({ agent, gpu }: { agent: AgentConfig | undefined; gpu: 
             </div>
             <p className="truncate text-[11px] text-zinc-500">{loadMessage}</p>
           </div>
+        )}
+
+        {rerunError && (
+          <p className="flex items-start gap-2 rounded bg-red-500/10 p-2 text-xs text-red-300">
+            {rerunError}
+            <button type="button" onClick={() => setRerunError(null)} className="ml-auto text-red-200 hover:text-white">
+              Dismiss
+            </button>
+          </p>
         )}
 
         {error && status === 'ERROR' && <p className="rounded bg-red-500/10 p-2 text-xs text-red-300">{error}</p>}
@@ -210,10 +231,20 @@ export function RunPanel({ agent, gpu }: { agent: AgentConfig | undefined; gpu: 
           <>
             <RunTimeline steps={steps} onJump={jumpToStep} />
             <SectionTitle tip="trace">Trace · {steps.length} steps</SectionTitle>
-            <TraceView steps={steps} follow={!viewedRun} />
+            {editableRun && !busy && (
+              <p className="text-[11px] text-zinc-500">
+                Hover a step and press <span className="text-zinc-300">Edit</span> to change a reply or tool result and re-run from there. <InfoTip id="rerun" />
+              </p>
+            )}
+            <TraceView
+              steps={steps}
+              follow={!viewedRun}
+              onEdit={editableRun && !busy ? (index) => setEditing({ run: editableRun, index }) : undefined}
+            />
           </>
         )}
         {!viewedRun && stream && <LiveReply stream={stream} />}
+        {editing && <EditStepModal run={editing.run} index={editing.index} onClose={() => setEditing(null)} onRun={(text) => void rerun(text)} />}
       </div>
     </div>
   )

@@ -51,6 +51,10 @@ export const traceStepSchema = z.object({
   depth: z.number().int().min(1).max(10).optional(),
   /** Name of the sub-agent that produced this step (only when nested). */
   agent: z.string().optional(),
+  /** Copied from an earlier run when re-running from a step. */
+  replayed: z.boolean().optional(),
+  /** Changed by the user before re-running. */
+  edited: z.boolean().optional(),
 })
 export type TraceStep = z.infer<typeof traceStepSchema>
 
@@ -68,5 +72,9 @@ export const runRecordSchema = z.object({
   endedAt: z.number().optional(),
   outcome: runOutcomeSchema,
   steps: z.array(traceStepSchema),
+  /** Earlier chat turns sent before userMessage (missing on older runs). */
+  history: z.array(z.object({ role: z.enum(['system', 'user', 'assistant']), content: z.string() })).optional(),
+  /** Set when this run was re-run from a step of another run. */
+  rerunOf: z.string().optional(),
 })
 export type RunRecord = z.infer<typeof runRecordSchema>

@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { CircleCheck, CircleX, ListChecks, Plus, Square, Trash } from 'lucide-react'
+import { CircleCheck, CircleX, Gavel, ListChecks, Plus, Square, Trash } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { isBusy, useAgentStore } from '../../core/agent/store'
 import type { AgentConfig, RunRecord } from '../../core/agent/types'
@@ -9,6 +9,7 @@ import type { CheckKind, EvalCase, EvalCaseResult, EvalSet } from '../../core/ev
 import { db } from '../../core/memory/db'
 import { Button } from '../ui/Button'
 import { inputClass } from '../ui/Field'
+import { InfoTip } from '../ui/InfoTip'
 import { SectionTitle } from '../ui/SectionTitle'
 import { VersionHistory } from './VersionHistory'
 
@@ -88,14 +89,26 @@ function CaseEditor({ c, index, result, onChange, onRemove, onOpenRun, disabled 
             <option key={k} value={k}>{CHECK_LABELS[k]}</option>
           ))}
         </select>
-        <input
-          aria-label={`Expected value for case ${index + 1}`}
-          value={c.check.value}
-          disabled={disabled}
-          onChange={(e) => onChange({ ...c, check: { ...c.check, value: e.target.value } })}
-          placeholder={c.check.kind === 'tool_used' ? 'tool name, e.g. calculator' : c.check.kind === 'regex' ? 'pattern, e.g. 39[01]' : 'expected text'}
-          className={`${inputClass} font-mono`}
-        />
+        {c.check.kind === 'judge' ? (
+          <textarea
+            aria-label={`Rubric for case ${index + 1}`}
+            value={c.check.value}
+            disabled={disabled}
+            onChange={(e) => onChange({ ...c, check: { ...c.check, value: e.target.value } })}
+            rows={2}
+            placeholder="What a good answer must do, e.g. “Names a price, stays under 50 words, polite tone”"
+            className={`${inputClass} resize-y`}
+          />
+        ) : (
+          <input
+            aria-label={`Expected value for case ${index + 1}`}
+            value={c.check.value}
+            disabled={disabled}
+            onChange={(e) => onChange({ ...c, check: { ...c.check, value: e.target.value } })}
+            placeholder={c.check.kind === 'tool_used' ? 'tool name, e.g. calculator' : c.check.kind === 'regex' ? 'pattern, e.g. 39[01]' : 'expected text'}
+            className={`${inputClass} font-mono`}
+          />
+        )}
       </div>
       {result && (
         <div className="flex items-start gap-1.5 pl-5 text-xs">
@@ -108,7 +121,53 @@ function CaseEditor({ c, index, result, onChange, onRemove, onOpenRun, disabled 
         </div>
       )}
       {result?.answer && <p className="line-clamp-2 pl-5 text-xs text-zinc-500">“{result.answer}”</p>}
+      {result?.grader && (
+        <details className="pl-5 text-xs">
+          <summary className="cursor-pointer text-zinc-500">Graded by {result.grader.agentName}</summary>
+          <pre className="mt-1 max-h-40 overflow-auto rounded bg-zinc-950 p-2 font-mono text-[11px] whitespace-pre-wrap text-zinc-300">{result.grader.raw.join('\n\n— retry —\n\n')}</pre>
+        </details>
+      )}
     </li>
+  )
+}
+
+/** Which agent grades the "AI grader" cases of a set. */
+function GraderPicker({ set, agent, disabled }: { set: EvalSet; agent: AgentConfig | undefined; disabled: boolean }) {
+  const agents = useLiveQuery(() => db.agents.orderBy('name').toArray(), [], [])
+  const grader = agents.find((a) => a.id === set.judgeAgentId) ?? agent
+  const selfGrading = !set.judgeAgentId || grader?.id === agent?.id
+  const modelClash = grader && agent && grader.provider === 'webllm' && agent.provider === 'webllm' && grader.modelId !== agent.modelId
+  return (
+    <div className="space-y-1.5 rounded-md border border-zinc-800 p-3">
+      <div className="flex items-center gap-2">
+        <Gavel className="size-3.5 shrink-0 text-zinc-400" />
+        <label htmlFor={`grader-${set.id}`} className="text-xs text-zinc-300">
+          Grader
+        </label>
+        <InfoTip id="grader" />
+        <select
+          id={`grader-${set.id}`}
+          value={set.judgeAgentId ?? ''}
+          disabled={disabled}
+          onChange={(e) => void db.evalSets.update(set.id, { judgeAgentId: e.target.value || undefined })}
+          className={`${inputClass} ml-auto max-w-64`}
+        >
+          <option value="">The tested agent grades itself</option>
+          {agents.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      {modelClash ? (
+        <p className="text-[11px] text-amber-300">
+          The grader uses a different local model ({grader.modelId}), so the models will swap for every case. Pick a grader on the same model, or one with an API key.
+        </p>
+      ) : (
+        selfGrading && <p className="text-[11px] text-zinc-500">Self-grading is free but lenient. A separate agent, ideally a larger model, grades more honestly.</p>
+      )}
+    </div>
   )
 }
 
@@ -172,6 +231,8 @@ function SetEditor({ set, agent, onOpenRun }: { set: EvalSet; agent: AgentConfig
           Delete
         </Button>
       </div>
+
+      {draft.cases.some((c) => c.check.kind === 'judge') && <GraderPicker set={set} agent={agent} disabled={disabled} />}
 
       <div className="space-y-2 rounded-md border border-zinc-800 bg-zinc-900/60 p-3">
         <div className="flex flex-wrap items-center gap-2">

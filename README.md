@@ -1,5 +1,7 @@
 # KantoLab
 
+**Live:** https://dmarcllanes.github.io/kantodev/ (deployed from `main` by `.github/workflows/deploy.yml`)
+
 A free, zero-backend playground for assembling, running and inspecting AI agents — entirely in the browser.
 
 - **Local models via WebGPU** ([WebLLM](https://github.com/mlc-ai/web-llm)), running in a Web Worker so the UI stays smooth.

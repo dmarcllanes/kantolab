@@ -1,6 +1,6 @@
 # KantoLab
 
-**Live:** https://dmarcllanes.github.io/kantodev/ (deployed from `main` by `.github/workflows/deploy.yml`)
+**Live:** https://dmarcllanes.github.io/kantolab/ (deployed from `main` by `.github/workflows/deploy.yml`)
 
 A free, zero-backend playground for assembling, running and inspecting AI agents — entirely in the browser.
 

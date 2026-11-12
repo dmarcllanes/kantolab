@@ -1,0 +1,79 @@
+{
+  "id": "sample-approval",
+  "agentId": "sample",
+  "agentName": "Researcher",
+  "modelId": "Llama-3.2-3B-Instruct-q4f16_1-MLC",
+  "userMessage": "What's the title of https://example.com?",
+  "startedAt": 1793000000000,
+  "endedAt": 1793000010022,
+  "outcome": "completed",
+  "steps": [
+    {
+      "id": "s1",
+      "kind": "system",
+      "at": 1793000000000,
+      "content": "You research questions for the user. Prefer fetching a source over guessing.\n\n## How to respond\nReply with exactly ONE JSON object and nothing else.\n- To call a tool: {\"thought\": \"<why>\", \"tool\": \"<tool name>\", \"args\": { ... }}\n- To answer the user: {\"thought\": \"<why>\", \"final\": \"<your answer>\"}\nAfter a tool call you will get a message starting with TOOL_RESULT. Use it, then call another tool or give the final answer.\n\n## Tools\n### fetch_url\nHTTP GET a public URL from the browser and return the start of the response body. Many sites block cross-origin requests (CORS). Requires user approval.\nInput JSON Schema: {\"type\":\"object\",\"properties\":{\"url\":{\"type\":\"string\",\"format\":\"uri\"}},\"required\":[\"url\"],\"additionalProperties\":false,\"$schema\":\"http://json-schema.org/draft-07/schema#\"}",
+      "data": {
+        "tools": [
+          "fetch_url"
+        ],
+        "provider": "webllm:Llama-3.2-3B-Instruct-q4f16_1-MLC"
+      }
+    },
+    {
+      "id": "s2",
+      "kind": "user",
+      "at": 1793000000002,
+      "content": "What's the title of https://example.com?"
+    },
+    {
+      "id": "s3",
+      "kind": "error",
+      "at": 1793000002212,
+      "content": "Reply contains an unterminated JSON object.",
+      "data": {
+        "step": 1,
+        "ms": 2207,
+        "raw": "I will fetch the page now: {\"tool\": \"fetch_url\", \"args\": {\"url\": \"https://example.com\"}"
+      }
+    },
+    {
+      "id": "s4",
+      "kind": "tool_call",
+      "at": 1793000004172,
+      "content": "fetch_url({\"url\":\"https://example.com\"})",
+      "data": {
+        "step": 2,
+        "ms": 1958,
+        "tool": "fetch_url",
+        "args": {
+          "url": "https://example.com"
+        },
+        "thought": "Fetch the page to read its title.",
+        "raw": "{\"thought\":\"Fetch the page to read its title.\",\"tool\":\"fetch_url\",\"args\":{\"url\":\"https://example.com\"}}"
+      }
+    },
+    {
+      "id": "s5",
+      "kind": "approval",
+      "at": 1793000008292,
+      "content": "Denied",
+      "data": {
+        "tool": "fetch_url",
+        "approved": false
+      }
+    },
+    {
+      "id": "s6",
+      "kind": "assistant",
+      "at": 1793000010022,
+      "content": "I couldn't check the page because the fetch was denied. If you allow it, I can read the title directly.",
+      "data": {
+        "step": 3,
+        "ms": 1727,
+        "thought": "The user denied the fetch, so I cannot read the page.",
+        "raw": "{\"thought\":\"The user denied the fetch, so I cannot read the page.\",\"final\":\"I couldn't check the page because the fetch was denied. If you allow it, I can read the title directly.\"}"
+      }
+    }
+  ]
+}

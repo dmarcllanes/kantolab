@@ -1,0 +1,72 @@
+{
+  "id": "sample-calculator",
+  "agentId": "sample",
+  "agentName": "Starter agent",
+  "modelId": "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+  "userMessage": "Dinner was ₱2,350 and we want to tip 12%. How much does each of the 4 of us pay?",
+  "startedAt": 1793000000000,
+  "endedAt": 1793000003355,
+  "outcome": "completed",
+  "steps": [
+    {
+      "id": "s1",
+      "kind": "system",
+      "at": 1793000000000,
+      "content": "You are a careful assistant. Use the calculator for any arithmetic and current_time for anything about dates or times. Keep final answers short.\n\n## How to respond\nReply with exactly ONE JSON object and nothing else.\n- To call a tool: {\"thought\": \"<why>\", \"tool\": \"<tool name>\", \"args\": { ... }}\n- To answer the user: {\"thought\": \"<why>\", \"final\": \"<your answer>\"}\nAfter a tool call you will get a message starting with TOOL_RESULT. Use it, then call another tool or give the final answer.\n\n## Tools\n### calculator\nEvaluate an arithmetic expression. Supports + - * / % ^, parentheses, pi, e and sqrt, abs, round, floor, ceil, ln, log, exp, sin, cos, tan, min, max.\nInput JSON Schema: {\"type\":\"object\",\"properties\":{\"expression\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":500,\"description\":\"e.g. \\\"(12.5 * 4) / sqrt(16)\\\"\"}},\"required\":[\"expression\"],\"additionalProperties\":false,\"$schema\":\"http://json-schema.org/draft-07/schema#\"}\n\n### current_time\nGet the current date and time, optionally in an IANA time zone like 'Asia/Manila'.\nInput JSON Schema: {\"type\":\"object\",\"properties\":{\"timeZone\":{\"type\":\"string\",\"maxLength\":64}},\"additionalProperties\":false,\"$schema\":\"http://json-schema.org/draft-07/schema#\"}",
+      "data": {
+        "tools": [
+          "calculator",
+          "current_time"
+        ],
+        "provider": "webllm:Qwen2.5-1.5B-Instruct-q4f16_1-MLC"
+      }
+    },
+    {
+      "id": "s2",
+      "kind": "user",
+      "at": 1793000000002,
+      "content": "Dinner was ₱2,350 and we want to tip 12%. How much does each of the 4 of us pay?"
+    },
+    {
+      "id": "s3",
+      "kind": "tool_call",
+      "at": 1793000001842,
+      "content": "calculator({\"expression\":\"2350 * 1.12 / 4\"})",
+      "data": {
+        "step": 1,
+        "ms": 1838,
+        "tool": "calculator",
+        "args": {
+          "expression": "2350 * 1.12 / 4"
+        },
+        "thought": "Split the bill: total with 12% tip, divided by 4.",
+        "raw": "{\"thought\":\"Split the bill: total with 12% tip, divided by 4.\",\"tool\":\"calculator\",\"args\":{\"expression\":\"2350 * 1.12 / 4\"}}"
+      }
+    },
+    {
+      "id": "s4",
+      "kind": "tool_result",
+      "at": 1793000001845,
+      "content": "calculator ✓",
+      "data": {
+        "ok": true,
+        "output": {
+          "result": 658
+        },
+        "ms": 1
+      }
+    },
+    {
+      "id": "s5",
+      "kind": "assistant",
+      "at": 1793000003355,
+      "content": "Each person pays ₱658.00 (₱2,350 + 12% tip = ₱2,632, split 4 ways).",
+      "data": {
+        "step": 2,
+        "ms": 1507,
+        "thought": "I have the per-person amount.",
+        "raw": "{\"thought\":\"I have the per-person amount.\",\"final\":\"Each person pays ₱658.00 (₱2,350 + 12% tip = ₱2,632, split 4 ways).\"}"
+      }
+    }
+  ]
+}

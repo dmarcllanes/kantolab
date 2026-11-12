@@ -1,0 +1,12 @@
+[
+  {
+    "file": "bill-split-calculator.json",
+    "title": "Bill split with the calculator",
+    "description": "One tool call, validated input and output, then a final answer."
+  },
+  {
+    "file": "approval-gate-denied.json",
+    "title": "Format error, then a denied approval",
+    "description": "The model breaks the JSON protocol, recovers, and the user denies a fetch_url call."
+  }
+]

@@ -12,7 +12,7 @@ export function Tabs<T extends string>({
   right?: ReactNode
 }) {
   return (
-    <div className="flex items-center gap-1 border-b border-zinc-800 px-2">
+    <div className="flex items-center gap-1 border-b border-zinc-800 px-3">
       <div role="tablist" className="flex min-w-0 gap-1 overflow-x-auto">
         {tabs.map((t) => (
           <button
@@ -21,8 +21,8 @@ export function Tabs<T extends string>({
             role="tab"
             aria-selected={value === t.id}
             onClick={() => onChange(t.id)}
-            className={`-mb-px shrink-0 border-b-2 px-3 py-2 text-sm transition-colors ${
-              value === t.id ? 'border-emerald-400 text-zinc-100' : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            className={`-mb-px shrink-0 rounded-t-lg border-b-[3px] px-4 py-3 text-sm font-medium transition-colors ${
+              value === t.id ? 'border-emerald-500 text-emerald-300' : 'border-transparent text-zinc-500 hover:bg-zinc-500/10 hover:text-zinc-100'
             }`}
           >
             {t.label}

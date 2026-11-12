@@ -1,3 +1,4 @@
+import { presetForBaseUrl } from '../../core/engine/cloudProviders'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Copy, FileUp, LayoutTemplate, Plus, Share2, Trash } from 'lucide-react'
 import { useRef, useState } from 'react'
@@ -10,7 +11,20 @@ import { Button } from '../ui/Button'
 import { ImportAgentModal } from './ImportAgentModal'
 import { ShareModal } from './ShareModal'
 import { TemplatesModal } from './TemplatesModal'
+import { GuideNote } from '../guide/GuideNote'
 
+
+/** Short provider label for the list: "Groq", "Claude", or the server's host. */
+function providerName(a: { provider: string; baseUrl: string }): string {
+  if (a.provider === 'anthropic') return 'Claude'
+  const preset = presetForBaseUrl(a.baseUrl)
+  if (preset) return preset.name
+  try {
+    return new URL(a.baseUrl).host
+  } catch {
+    return 'server'
+  }
+}
 export function AgentList() {
   const agents = useLiveQuery(() => db.agents.orderBy('updatedAt').reverse().toArray(), [], [])
   const selectedId = useAgentStore((s) => s.selectedAgentId)
@@ -67,17 +81,18 @@ export function AgentList() {
           }}
         />
       </div>
+      <GuideNote id="agents" className="mx-2 mb-2" />
       {problem && <p className="mx-3 mb-2 rounded bg-red-500/10 p-2 text-xs text-red-300">{problem}</p>}
       <ul className="min-h-0 space-y-0.5 overflow-y-auto px-2 pb-2">
         {agents.map((a) => (
-          <li key={a.id} className={`group flex items-center rounded-md ${a.id === selectedId ? 'bg-zinc-800' : 'hover:bg-zinc-900'}`}>
-            <button type="button" onClick={() => select(a.id)} className="min-w-0 flex-1 px-2 py-1.5 text-left">
-              <span className="block truncate text-sm">{a.name}</span>
+          <li key={a.id} className={`group flex items-center rounded-full transition-colors ${a.id === selectedId ? 'bg-emerald-500/15 text-emerald-100' : 'hover:bg-zinc-500/10'}`}>
+            <button type="button" onClick={() => select(a.id)} aria-current={a.id === selectedId ? 'true' : undefined} className="min-w-0 flex-1 py-2 pr-1 pl-4 text-left">
+              <span className={`block truncate text-sm ${a.id === selectedId ? 'font-medium' : ''}`}>{a.name}</span>
               <span className="block truncate font-mono text-[11px] text-zinc-500">
-                {a.provider === 'webllm' ? a.modelId : `${a.provider} · ${a.modelId || '—'}`}
+                {a.provider === 'webllm' ? a.modelId : `${providerName(a)} · ${a.modelId || '—'}`}
               </span>
             </button>
-            <div className="flex pr-1 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+            <div className="flex pr-2 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
               <button type="button" aria-label={`Share ${a.name}`} onClick={() => setSharing(a)} className="rounded p-1 text-zinc-500 hover:text-zinc-200">
                 <Share2 className="size-3.5" />
               </button>
@@ -99,7 +114,7 @@ export function AgentList() {
       <button
         type="button"
         onClick={() => setTemplates(true)}
-        className="mx-2 mb-2 flex items-center gap-1.5 rounded-md border border-dashed border-zinc-800 px-2 py-1.5 text-left text-xs text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+        className="mx-2 mb-2 flex items-center gap-2 rounded-full border border-dashed border-zinc-700 px-4 py-2 text-left text-xs text-zinc-500 hover:border-emerald-500/50 hover:bg-emerald-500/5 hover:text-emerald-300"
       >
         <LayoutTemplate className="size-3.5 shrink-0" /> Start from a multi-agent template
       </button>

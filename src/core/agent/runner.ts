@@ -2,7 +2,7 @@
 // It holds no global state — callers pass hooks for status, trace and approval.
 import type { ChatMessage, ChatProvider } from '../engine/types'
 import { invokeTool, type Tool, type ToolResult } from '../tools/types'
-import { buildSystemPrompt, correctionMessage, parseReply, toolResultMessage } from './protocol'
+import { buildSystemPrompt, correctionMessage, parseReply, splitThinking, toolResultMessage } from './protocol'
 import type { AgentConfig, AgentStatus, TraceStep } from './types'
 
 export interface RunHooks {
@@ -100,16 +100,17 @@ export async function runAgent(opts: RunOptions, parentHooks: RunHooks): Promise
       messages.push({ role: 'assistant', content: raw })
 
       if (tools.length === 0) {
-        hooks.addStep({ kind: 'assistant', content: raw, data: { step, ms }, ...mark })
+        const { text, reasoning } = splitThinking(raw)
+        hooks.addStep({ kind: 'assistant', content: text, data: { step, ms, ...(reasoning ? { reasoning, raw } : {}) }, ...mark })
         hooks.setStatus('COMPLETED')
-        return { status: 'COMPLETED', answer: raw, raw }
+        return { status: 'COMPLETED', answer: text, raw }
       }
 
       const reply = parseReply(raw)
 
       if (reply.kind === 'invalid') {
         formatErrors++
-        hooks.addStep({ kind: 'error', content: reply.error, data: { step, ms, raw }, ...mark })
+        hooks.addStep({ kind: 'error', content: reply.error, data: { step, ms, raw, reasoning: reply.reasoning }, ...mark })
         if (formatErrors > MAX_CONSECUTIVE_FORMAT_ERRORS) {
           return { status: 'ERROR', error: `Model broke the JSON protocol ${formatErrors} times in a row.` }
         }
@@ -119,7 +120,7 @@ export async function runAgent(opts: RunOptions, parentHooks: RunHooks): Promise
       formatErrors = 0
 
       if (reply.kind === 'final') {
-        hooks.addStep({ kind: 'assistant', content: reply.answer, data: { step, ms, thought: reply.thought, raw }, ...mark })
+        hooks.addStep({ kind: 'assistant', content: reply.answer, data: { step, ms, thought: reply.thought, reasoning: reply.reasoning, raw }, ...mark })
         hooks.setStatus('COMPLETED')
         return { status: 'COMPLETED', answer: reply.answer, raw }
       }
@@ -127,7 +128,7 @@ export async function runAgent(opts: RunOptions, parentHooks: RunHooks): Promise
       hooks.addStep({
         kind: 'tool_call',
         content: `${reply.tool}(${truncate(JSON.stringify(reply.args) ?? '', 200)})`,
-        data: { step, ms, tool: reply.tool, args: reply.args, thought: reply.thought, raw },
+        data: { step, ms, tool: reply.tool, args: reply.args, thought: reply.thought, reasoning: reply.reasoning, raw },
         ...mark,
       })
 

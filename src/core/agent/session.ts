@@ -1,11 +1,14 @@
 // Glue between the UI, the store, the engines and the loop. Owns the one
 // active provider, the abort controller and the pending approval.
-import { apiKeySetting, createAnthropicProvider, createOpenAICompatibleProvider } from '../engine/providers'
+import { apiKeySetting, createAnthropicProvider, createOpenAICompatibleProvider, isLocalServer, testConnection, type ConnectionCheck } from '../engine/providers'
+import { serverKeySetting } from '../engine/cloudProviders'
 import type { ChatMessage, ChatProvider } from '../engine/types'
 import { loadModel, unloadModel } from '../engine/webllm'
-import { db, getSetting } from '../memory/db'
+import { db, deleteSetting, getSetting, setSetting } from '../memory/db'
 import { resolveTools } from '../tools/registry'
 import { runAgent, type RunOutcome } from './runner'
+import type { ProviderKind } from '../engine/types'
+import { consentProblem, currentConsent } from '../privacy/consent'
 import { isBusy, useAgentStore } from './store'
 import { planResume, type ResumePlan } from './replay'
 import { resolveAgentTools, type ResolveDeps } from './subagent'
@@ -19,7 +22,14 @@ const activeProviders = new Set<ChatProvider>()
 let controller: AbortController | null = null
 let approvalResolver: ((approved: boolean) => void) | null = null
 
+/** Throw if the user hasn't allowed this kind of provider on this visit. */
+function requireConsent(provider: ProviderKind): void {
+  const problem = consentProblem(provider, currentConsent())
+  if (problem) throw new Error(problem)
+}
+
 async function ensureLocalModel(modelId: string): Promise<ChatProvider> {
+  requireConsent('webllm')
   if (localProvider && s().loadedModelId === modelId) return localProvider
   s().transition('LOADING_MODEL')
   s().setLoadProgress(0, 'Starting worker…')
@@ -35,14 +45,49 @@ async function ensureLocalModel(modelId: string): Promise<ChatProvider> {
   return localProvider
 }
 
+/** Where an agent's API key is stored: one per OpenAI-compatible server, one for Anthropic. */
+export function keySettingFor(agent: Pick<AgentConfig, 'provider' | 'baseUrl'>): string {
+  return agent.provider === 'openai-compatible' ? serverKeySetting(agent.baseUrl) : apiKeySetting('anthropic')
+}
+
+/** The saved key for an agent. OpenAI-compatible servers fall back to the older shared key. */
+export async function savedKeyFor(agent: Pick<AgentConfig, 'provider' | 'baseUrl'>): Promise<string> {
+  if (agent.provider === 'webllm') return ''
+  const own = (await getSetting<string>(keySettingFor(agent)))?.trim()
+  if (own || agent.provider === 'anthropic') return own ?? ''
+  return ((await getSetting<string>(apiKeySetting('openai-compatible'))) ?? '').trim()
+}
+
+export async function saveKeyFor(agent: Pick<AgentConfig, 'provider' | 'baseUrl'>, key: string): Promise<void> {
+  const k = key.trim()
+  if (k) await setSetting(keySettingFor(agent), k)
+  else await deleteSetting(keySettingFor(agent))
+}
+
 async function providerFor(agent: AgentConfig): Promise<ChatProvider> {
   if (agent.provider === 'webllm') return ensureLocalModel(agent.modelId)
+  requireConsent(agent.provider)
   if (!agent.modelId.trim()) throw new Error('Set a model name for this agent first.')
-  const apiKey = await getSetting<string>(apiKeySetting(agent.provider))
-  if (!apiKey) throw new Error('No API key saved for this provider. Add one in Settings.')
+  const apiKey = await savedKeyFor(agent)
+  // Model servers on this computer (Ollama, LM Studio, llama.cpp) don't need a key.
+  const keyless = agent.provider === 'openai-compatible' && isLocalServer(agent.baseUrl)
+  if (!apiKey && !keyless) throw new Error('No API key saved for this provider. Paste it in the agent’s API key field (or Settings) and press Save.')
   if (agent.provider === 'anthropic') return createAnthropicProvider({ apiKey, model: agent.modelId })
   if (!agent.baseUrl.trim()) throw new Error('Set a base URL for this OpenAI-compatible agent.')
-  return createOpenAICompatibleProvider({ baseUrl: agent.baseUrl, apiKey, model: agent.modelId })
+  return createOpenAICompatibleProvider({ baseUrl: agent.baseUrl, apiKey: keyless ? '' : apiKey, model: agent.modelId })
+}
+
+/** Check an API agent's key, model and URL without generating anything. */
+export async function checkConnection(agent: AgentConfig): Promise<ConnectionCheck> {
+  if (agent.provider === 'webllm') return { ok: true, message: 'Local models need no connection.' }
+  const problem = consentProblem(agent.provider, currentConsent())
+  if (problem) return { ok: false, message: problem }
+  if (agent.provider === 'openai-compatible' && !agent.baseUrl.trim()) return { ok: false, message: 'Set a base URL first.' }
+  const apiKey = await savedKeyFor(agent)
+  const keyless = agent.provider === 'openai-compatible' && isLocalServer(agent.baseUrl)
+  if (!apiKey && !keyless) return { ok: false, message: 'No API key saved yet. Paste your key above and press Save.' }
+  if (agent.provider === 'anthropic') return testConnection({ provider: 'anthropic', apiKey, model: agent.modelId })
+  return testConnection({ provider: 'openai-compatible', apiKey: keyless ? '' : apiKey, model: agent.modelId, baseUrl: agent.baseUrl.trim() })
 }
 
 /**
@@ -50,6 +95,7 @@ async function providerFor(agent: AgentConfig): Promise<ChatProvider> {
  * machine, so a local model is only usable if it's the one already loaded.
  */
 async function subagentProviderFor(agent: AgentConfig): Promise<ChatProvider> {
+  requireConsent(agent.provider)
   if (agent.provider === 'webllm') {
     const loaded = s().loadedModelId
     if (!localProvider || loaded !== agent.modelId) {

@@ -15,9 +15,26 @@ const finalSchema = z.object({
 })
 
 export type ParsedReply =
-  | { kind: 'tool'; tool: string; args: unknown; thought?: string }
-  | { kind: 'final'; answer: string; thought?: string }
-  | { kind: 'invalid'; error: string }
+  | { kind: 'tool'; tool: string; args: unknown; thought?: string; reasoning?: string }
+  | { kind: 'final'; answer: string; thought?: string; reasoning?: string }
+  | { kind: 'invalid'; error: string; reasoning?: string }
+
+const THINK = /<(think|thinking|reasoning)>([\s\S]*?)(<\/\1>|$)/gi
+
+/**
+ * Reasoning models (Qwen3, DeepSeek-R1, …) may put their thinking in
+ * <think>…</think> before the reply. Separate it so braces inside the
+ * thinking can't be mistaken for the JSON, and keep it for the trace.
+ * An unclosed tag (cut off mid-thought) swallows the rest of the text.
+ */
+export function splitThinking(raw: string): { text: string; reasoning?: string } {
+  const parts: string[] = []
+  const text = raw.replace(THINK, (_m, _tag: string, inner: string) => {
+    if (inner.trim()) parts.push(inner.trim())
+    return ''
+  })
+  return parts.length ? { text: text.trim(), reasoning: parts.join('\n\n') } : { text: raw }
+}
 
 export function buildSystemPrompt(basePrompt: string, tools: Tool[]): string {
   if (tools.length === 0) return basePrompt
@@ -62,7 +79,13 @@ export function extractJsonObject(text: string): string | null {
 }
 
 export function parseReply(raw: string): ParsedReply {
-  const text = raw.trim()
+  const { text: visible, reasoning } = splitThinking(raw)
+  const parsed = parseVisible(visible.trim())
+  return reasoning ? { ...parsed, reasoning } : parsed
+}
+
+function parseVisible(text: string): ParsedReply {
+  if (!text) return { kind: 'invalid', error: 'Reply was empty (only reasoning, no answer).' }
   if (!text.includes('{')) return { kind: 'final', answer: text }
 
   const candidate = extractJsonObject(text)

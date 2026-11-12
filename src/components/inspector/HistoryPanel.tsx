@@ -8,6 +8,7 @@ import { db } from '../../core/memory/db'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { InfoTip } from '../ui/InfoTip'
+import { GuideNote } from '../guide/GuideNote'
 
 const sampleIndexSchema = z.array(z.object({ file: z.string(), title: z.string(), description: z.string() }))
 type Sample = z.infer<typeof sampleIndexSchema>[number]
@@ -84,6 +85,7 @@ export function HistoryPanel({ onOpened }: { onOpened: () => void }) {
 
   return (
     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
+      <GuideNote id="history" />
       {problem && <p className="rounded bg-red-500/10 p-2 text-xs text-red-300">{problem}</p>}
 
       <section className="space-y-2">

@@ -14,6 +14,7 @@ import { StatusPipeline } from '../viz/StatusPipeline'
 import { ApprovalGate } from './ApprovalGate'
 import { LiveReply } from './LiveReply'
 import { TraceView } from './TraceView'
+import { GuideNote } from '../guide/GuideNote'
 
 const secs = (ms: number) => `${(ms / 1000).toFixed(2)} s`
 
@@ -113,6 +114,7 @@ export function ComparePanel({ current, onOpenRun }: { current: AgentConfig | un
   return (
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
       <SectionTitle tip="compare">Compare two agents</SectionTitle>
+      <GuideNote id="compare" />
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <select aria-label="Agent A" value={ids.a} onChange={(e) => ids.setA(e.target.value)} className={inputClass} disabled={!!running}>

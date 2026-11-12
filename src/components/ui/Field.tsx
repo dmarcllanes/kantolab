@@ -3,7 +3,7 @@ import type { TipId } from '../tips/tips'
 import { InfoTip } from './InfoTip'
 
 export const inputClass =
-  'w-full rounded-md border border-zinc-800 bg-zinc-950 px-2.5 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/60 focus:outline-none'
+  'w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 transition-colors hover:border-zinc-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none disabled:opacity-60'
 
 type Control = ReactElement<{ id?: string; 'aria-describedby'?: string }>
 

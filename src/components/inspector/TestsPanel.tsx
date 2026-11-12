@@ -12,6 +12,7 @@ import { inputClass } from '../ui/Field'
 import { InfoTip } from '../ui/InfoTip'
 import { SectionTitle } from '../ui/SectionTitle'
 import { VersionHistory } from './VersionHistory'
+import { GuideNote } from '../guide/GuideNote'
 
 // Status colours (reserved for pass/fail), always paired with an icon and label.
 const GOOD = '#0ca30c'
@@ -313,6 +314,7 @@ export function TestsPanel({ agent, onOpenRun }: { agent: AgentConfig | undefine
       >
         Test sets
       </SectionTitle>
+      <GuideNote id="tests" />
 
       {sets && sets.length === 0 && (
         <div className="space-y-3 rounded-lg border border-dashed border-zinc-800 p-4 text-center">

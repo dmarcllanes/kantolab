@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
+    "@fontsource-variable/roboto": "^5.3.0",
+    "@fontsource-variable/roboto-mono": "^5.3.0",
     "@mlc-ai/web-llm": "^0.2.88",
     "dexie": "^4.4.7",
     "dexie-react-hooks": "^4.4.0",

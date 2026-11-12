@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { AgentConfig, RunRecord } from '../agent/types'
 import type { EvalSet } from '../evals/types'
+import type { CustomModel } from '../engine/customModels'
 import type { CustomToolDef } from '../tools/custom'
 
 /** Key/value settings, including BYOK API keys. Never leaves the browser. */
@@ -23,6 +24,7 @@ export const db = new Dexie('kantolab') as Dexie & {
   documents: EntityTable<DocumentRecord, 'id'>
   customTools: EntityTable<CustomToolDef, 'id'>
   evalSets: EntityTable<EvalSet, 'id'>
+  customModels: EntityTable<CustomModel, 'id'>
 }
 
 db.version(1).stores({
@@ -34,6 +36,9 @@ db.version(1).stores({
 })
 db.version(2).stores({
   evalSets: 'id, name, updatedAt',
+})
+db.version(3).stores({
+  customModels: 'id, &modelId, createdAt',
 })
 
 export async function getSetting<T>(key: string): Promise<T | undefined> {

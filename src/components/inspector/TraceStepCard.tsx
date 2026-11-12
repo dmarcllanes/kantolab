@@ -2,6 +2,7 @@ import { Bot, Braces, CornerDownRight, Pencil, PackageCheck, Settings2, ShieldCh
 import { useState } from 'react'
 import type { TraceStep, TraceStepKind } from '../../core/agent/types'
 import { JsonView } from '../ui/JsonView'
+import { StepGuide } from '../guide/GuideNote'
 
 const KIND: Record<TraceStepKind, { label: string; icon: typeof Bot; tone: string; edge: string }> = {
   system: { label: 'System prompt', icon: Settings2, tone: 'text-zinc-400', edge: 'border-l-zinc-600' },
@@ -13,6 +14,13 @@ const KIND: Record<TraceStepKind, { label: string; icon: typeof Bot; tone: strin
   error: { label: 'Error', icon: TriangleExclamationPoint, tone: 'text-red-300', edge: 'border-l-red-400/70' },
 }
 
+
+/** Thinking a reasoning model wrote in <think> tags (see splitThinking). */
+function reasoningOf(data: unknown): string | null {
+  if (!data || typeof data !== 'object' || !('reasoning' in data)) return null
+  const r = (data as { reasoning?: unknown }).reasoning
+  return typeof r === 'string' && r.trim() ? r : null
+}
 export function TraceStepCard({ step, t0, index, onEdit }: { step: TraceStep; t0: number; index: number; onEdit?: () => void }) {
   const [showData, setShowData] = useState(false)
   const meta = KIND[step.kind]
@@ -66,6 +74,13 @@ export function TraceStepCard({ step, t0, index, onEdit }: { step: TraceStep; t0
       ) : (
         <p className={`mt-1.5 text-sm break-words whitespace-pre-wrap ${step.kind === 'tool_call' ? 'font-mono text-violet-100' : 'text-zinc-200'}`}>{step.content}</p>
       )}
+      {reasoningOf(step.data) && (
+        <details className="mt-2 rounded-xl bg-zinc-950/50 px-3 py-2">
+          <summary className="cursor-pointer text-xs text-zinc-500">Model’s reasoning ({reasoningOf(step.data)!.length} chars)</summary>
+          <pre className="mt-2 max-h-60 overflow-auto font-mono text-xs whitespace-pre-wrap text-zinc-400">{reasoningOf(step.data)}</pre>
+        </details>
+      )}
+      <StepGuide step={step} />
       {showData && step.data !== undefined && (
         <div className="mt-2">
           <JsonView value={step.data} />

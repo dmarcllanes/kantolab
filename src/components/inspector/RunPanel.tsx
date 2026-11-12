@@ -1,7 +1,8 @@
-import { ArrowLeft, Download, LoaderCircle, MessagesSquare, Play, Sparkles, Square, TriangleExclamationPoint } from 'lucide-react'
+import { ShieldCheck, ArrowLeft, Download, LoaderCircle, MessagesSquare, Play, Sparkles, Square, TriangleExclamationPoint } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { preloadModel, rerunFrom, sendMessage, stopRun } from '../../core/agent/session'
 import { isBusy, useAgentStore } from '../../core/agent/store'
+import { consentProblem, useConsent } from '../../core/privacy/consent'
 import type { AgentConfig, RunRecord } from '../../core/agent/types'
 import type { GpuProfile } from '../../core/engine/webgpu'
 import { db } from '../../core/memory/db'
@@ -13,6 +14,8 @@ import { examplePrompts } from '../viz/examples'
 import { HowItWorks } from '../viz/HowItWorks'
 import { RunTimeline } from '../viz/RunTimeline'
 import { StatusPipeline } from '../viz/StatusPipeline'
+import { GuideNote } from '../guide/GuideNote'
+import { NextStepBar } from '../guide/NextStepBar'
 import { ApprovalGate } from './ApprovalGate'
 import { EditStepModal } from './EditStepModal'
 import { LiveReply } from './LiveReply'
@@ -60,7 +63,10 @@ export function RunPanel({ agent, gpu }: { agent: AgentConfig | undefined; gpu: 
   const busy = isBusy(status) || batch !== null
   const isLocal = agent?.provider === 'webllm'
   const needsLoad = isLocal && loadedModelId !== agent.modelId
-  const noGpu = isLocal && gpu !== null && !gpu.supported
+  const consent = useConsent((s) => (s.decided ? s.choices : null))
+  const openPrivacy = useConsent((s) => s.openDialog)
+  const blocked = agent && consent ? consentProblem(agent.provider, consent) : null
+  const noGpu = isLocal && !blocked && gpu !== null && !gpu.supported
   const steps = viewedRun ? viewedRun.steps : trace
   const exportable = viewedRun ?? lastRun
   // Steps can be edited once a run is saved: a viewed run, or the live trace after it finished.
@@ -90,7 +96,7 @@ export function RunPanel({ agent, gpu }: { agent: AgentConfig | undefined; gpu: 
           {isLocal && !needsLoad && <span className="text-xs text-emerald-400">● model ready</span>}
           <div className="ml-auto flex gap-1">
             {isLocal && needsLoad && (
-              <Button size="sm" disabled={busy || noGpu} onClick={() => void preloadModel(agent.modelId)}>
+              <Button size="sm" disabled={busy || noGpu || !!blocked} onClick={() => void preloadModel(agent.modelId)}>
                 <Download className="size-3.5" /> Load model
               </Button>
             )}
@@ -103,6 +109,32 @@ export function RunPanel({ agent, gpu }: { agent: AgentConfig | undefined; gpu: 
         </div>
 
         <StatusPipeline status={viewedRun ? 'IDLE' : status} trace={steps} maxSteps={viewedRun ? undefined : agent?.maxSteps} />
+
+        <NextStepBar
+          hasAgent={!!agent}
+          isLocal={!!isLocal}
+          needsLoad={!!needsLoad}
+          noGpu={!!noGpu}
+          blocked={!!blocked}
+          status={status}
+          hasMessage={message.trim().length > 0}
+          hasSteps={steps.length > 0}
+          awaitingApproval={!!pending}
+          viewingSaved={!!viewedRun}
+          batch={batch !== null}
+          lastOutcome={lastRun?.outcome}
+          inChat={chat.length > 0}
+        />
+
+        {blocked && (
+          <div className="flex flex-wrap items-center gap-2 rounded bg-amber-500/10 p-2 text-xs text-amber-200">
+            <ShieldCheck className="size-3.5 shrink-0" />
+            <span className="min-w-0 flex-1">{isLocal ? 'Running AI on this device is turned off in your privacy choices.' : 'Sending messages to AI providers is turned off in your privacy choices.'}</span>
+            <Button size="sm" onClick={openPrivacy}>
+              Change privacy choices
+            </Button>
+          </div>
+        )}
 
         {noGpu && (
           <p className="flex items-start gap-2 rounded bg-red-500/10 p-2 text-xs text-red-300">
@@ -135,7 +167,7 @@ export function RunPanel({ agent, gpu }: { agent: AgentConfig | undefined; gpu: 
 
         {error && status === 'ERROR' && <p className="rounded bg-red-500/10 p-2 text-xs text-red-300">{error}</p>}
 
-        <div className="flex gap-2">
+        <div data-tour="run-box" className="flex gap-2">
           <textarea
             ref={box}
             value={message}
@@ -152,7 +184,7 @@ export function RunPanel({ agent, gpu }: { agent: AgentConfig | undefined; gpu: 
               <Square className="size-4" /> Stop
             </Button>
           ) : (
-            <Button variant="primary" className="h-auto" disabled={!agent || !message.trim() || busy || noGpu} onClick={() => void run()}>
+            <Button variant="primary" className="h-auto" disabled={!agent || !message.trim() || busy || noGpu || !!blocked} onClick={() => void run()}>
               {status === 'LOADING_MODEL' ? <LoaderCircle className="size-4 animate-spin" /> : <Play className="size-4" />} Run
             </Button>
           )}
@@ -231,6 +263,7 @@ export function RunPanel({ agent, gpu }: { agent: AgentConfig | undefined; gpu: 
           <>
             <RunTimeline steps={steps} onJump={jumpToStep} />
             <SectionTitle tip="trace">Trace · {steps.length} steps</SectionTitle>
+            <GuideNote id="trace" />
             {editableRun && !busy && (
               <p className="text-[11px] text-zinc-500">
                 Hover a step and press <span className="text-zinc-300">Edit</span> to change a reply or tool result and re-run from there. <InfoTip id="rerun" />

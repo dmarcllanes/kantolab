@@ -15,7 +15,8 @@ export const TIPS = {
     body: [
       'Where the model runs.',
       'Local (WebLLM) runs on your own GPU inside this browser tab: free and private, but it downloads the model first and small models are less capable.',
-      'Anthropic or OpenAI-compatible send each step to that company’s API with your key. Much smarter models, but each call costs money.',
+      'Free cloud AI (Groq, Google Gemini, OpenRouter, Cerebras, Mistral, Hugging Face, Cohere) sends each step to that company with a free API key: much smarter models, no download, within their free limits.',
+      'Your own server is Ollama or LM Studio on your computer. Anthropic Claude needs a paid key.',
     ],
   },
   model: {
@@ -179,6 +180,22 @@ export const TIPS = {
     body: [
       'Send the same question to two agents and see their answers, speed and tool use side by side. Great for trying a bigger model, a different prompt, or a different temperature.',
       'They run one after another. If both are local with different models, the second model has to load first (only one fits in GPU memory).',
+    ],
+  },
+  customModel: {
+    title: 'Your own model',
+    body: [
+      'Quantized your own model, or fine-tuned one? Three free ways to use it here:',
+      'MLC format (from mlc_llm convert_weight): pick its folder and it’s copied into this browser, never uploaded. Or host it on a free Hugging Face repo and paste the URL.',
+      'GGUF (Q4_K_M and friends): run it with Ollama, LM Studio or llama.cpp on your computer and point the agent at it. No key needed for localhost.',
+    ],
+  },
+  modelLib: {
+    title: 'Model library',
+    body: [
+      'WebGPU needs the model’s compiled code (a .wasm file from mlc_llm compile) besides its weights.',
+      'A fine-tune keeps its base model’s architecture, so it can borrow a built-in library: pick the built-in model it was trained from, with the same quantization (e.g. q4f16_1).',
+      'A new architecture or a different context size needs its own compiled .wasm.',
     ],
   },
   rerun: {

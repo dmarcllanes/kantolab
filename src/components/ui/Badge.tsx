@@ -11,7 +11,7 @@ const TONES = {
 }
 
 export function Badge({ tone = 'neutral', children }: { tone?: keyof typeof TONES; children: ReactNode }) {
-  return <span className={`inline-flex items-center rounded px-1.5 py-0.5 font-mono text-[11px] ${TONES[tone]}`}>{children}</span>
+  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[11px] ${TONES[tone]}`}>{children}</span>
 }
 
 const STATUS_TONE: Record<AgentStatus, keyof typeof TONES> = {
